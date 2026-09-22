@@ -1714,7 +1714,7 @@ def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
         grid=False, exponent=120.0, flat_face_ticks=True, auto=True):
     """Apply the style globally. Figures are finished automatically on save.
 
-    `dark` may be True or a background colour. `scale` shrinks frame, tick and
+    `dark` may be True or a background color. `scale` shrinks frame, tick and
     data-line weights; `text` scales font sizes with it.
     """
     plt.style.use(["default", get_style_path()])
