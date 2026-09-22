@@ -1081,7 +1081,7 @@ def style_hvb_errorbar(err_container, ax=None, capsize=None, line_kwargs=None, c
             lc = LineCollection(segs, colors=[color], linewidths=lw, capstyle="round", zorder=line.get_zorder())
             if clip_path is not None:
                 lc.set_clip_path(clip_path)
-            ax.add_collection(lc)
+            ax.add_collection(lc, autolim=False)
             custom_caps.append(lc)
             line.set_visible(False)
 
