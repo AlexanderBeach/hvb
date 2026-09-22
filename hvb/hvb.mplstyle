@@ -1,0 +1,75 @@
+figure.dpi: 450
+savefig.dpi: 450
+
+# Embed outline fonts (Type 42) rather than Type 3.
+pdf.fonttype: 42
+ps.fonttype: 42
+figure.facecolor: white
+axes.facecolor: white
+
+font.family: Segoe UI, DejaVu Sans
+font.size: 12
+font.weight: normal
+text.color: 0.13333333333333333
+
+axes.edgecolor: 0.13333333333333333
+axes.linewidth: 2.6
+axes.labelcolor: 0.13333333333333333
+axes.labelsize: 16
+axes.titlesize: 18
+axes.titleweight: normal
+
+# Keep content clear of the frame
+axes.xmargin: 0.1
+axes.ymargin: 0.1
+
+axes.grid: True
+axes.axisbelow: True
+grid.color: 0.8156862745098039
+grid.linestyle: -
+grid.linewidth: 0.9
+
+xtick.color: 0.13333333333333333
+ytick.color: 0.13333333333333333
+xtick.direction: in
+ytick.direction: in
+xtick.major.size: 10
+ytick.major.size: 10
+xtick.major.width: 2.0
+ytick.major.width: 2.0
+
+xtick.major.pad: 3
+ytick.major.pad: 3
+
+xtick.labelsize: 14
+ytick.labelsize: 14
+
+xtick.top: True
+ytick.right: True
+xtick.labeltop: False
+ytick.labelright: False
+
+lines.linewidth: 3.0
+lines.solid_capstyle: round
+lines.dash_capstyle: round
+lines.solid_joinstyle: round
+lines.dash_joinstyle: round
+errorbar.capsize: 5.0
+axes.prop_cycle: cycler('color', [(0.207843, 0.486275, 0.854902), (0.850980, 0.000000, 0.000000), (0.258824, 0.760784, 0.458824), (0.505882, 0.254902, 0.584314), (0.866667, 0.482353, 0.000000), (0.917647, 0.878431, 0.039216), (0.972549, 0.207843, 0.635294), (0.392157, 0.203922, 0.113725)])
+
+# Legend
+legend.frameon: True
+legend.fancybox: True
+legend.framealpha: 0.78
+legend.edgecolor: 0.8156862745098039
+legend.facecolor: white
+
+legend.borderpad: 0.35
+legend.borderaxespad: 0.7
+legend.labelspacing: 0.25
+legend.handlelength: 0.95
+legend.handletextpad: 0.5
+legend.columnspacing: 0.9
+
+legend.fontsize: 12
+legend.loc: best

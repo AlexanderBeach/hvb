@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hvb"
+version = "0.1.0"
+description = "Matplotlib house style: mplstyle, squircle frame helpers, and categorical palettes."
+requires-python = ">=3.9"
+readme = "README.md"
+license = {text = "MIT"}
+dependencies = ["matplotlib>=3.8", "numpy"]
+
+[project.urls]
+Repository = "https://github.com/AlexanderBeach/hvb"
+
+[tool.setuptools]
+packages = ["hvb"]
+
+[tool.setuptools.package-data]
+hvb = ["*.mplstyle"]
