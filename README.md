@@ -6,10 +6,28 @@ functions that replace the square axes frame with a superellipse (a "squircle," 
 corners of bars, histograms, box plots, violin plots, and error bars, and provide a set of
 categorical color palettes.
 
+<p>
+  <img src="docs/example_light.png" width="49%" alt="Four example panels in the light style">
+  <img src="docs/example_dark.png" width="49%" alt="The same four panels in the dark style">
+</p>
+
+The same four panels drawn with `hvb.use(scale=0.6)` (left) and `hvb.use(scale=0.6, dark=True)`
+(right). They show a line plot with a legend, a primary line over `muted` context lines with a
+`fill` confidence band, grouped bars, and error bars with a fit on a logarithmic axis.
+
 ## Installation
+
+With pip:
 
 ```
 pip install git+https://github.com/AlexanderBeach/hvb
+```
+
+With uv, either into the active environment or as a dependency of a uv project:
+
+```
+uv pip install git+https://github.com/AlexanderBeach/hvb
+uv add git+https://github.com/AlexanderBeach/hvb
 ```
 
 ## Usage
@@ -67,14 +85,14 @@ Polar and 3D axes are left with the default matplotlib frame.
 
 | # | hue | `default` | `muted` | `fill` | `dark` |
 |---|---|---|---|---|---|
-| 0 | blue | `#357CDA` | `#95C2FF` | `#BBD8FF` | `#9CC9FF` |
-| 1 | red | `#D90000` | `#FFA091` | `#FFC3B9` | `#FF5416` |
-| 2 | green | `#42C275` | `#A2DDB2` | `#C0E9CB` | `#4CD485` |
-| 3 | purple | `#814195` | `#D2A2E1` | `#E4C2EF` | `#CF8AE3` |
-| 4 | orange | `#DD7B00` | `#F6BB8D` | `#FCD3B2` | `#ED9E3E` |
-| 5 | yellow | `#EAE00A` | `#E5E3A6` | `#EDECC2` | `#E3D03F` |
-| 6 | pink | `#F835A2` | `#FFABCF` | `#FFCADF` | `#F670A4` |
-| 7 | brown | `#64341D` | `#CC9F8B` | `#E1C0B2` | `#CB8668` |
+| 0 | blue | <img src="docs/swatches/357CDA.svg" alt="#357CDA"> `#357CDA` | <img src="docs/swatches/95C2FF.svg" alt="#95C2FF"> `#95C2FF` | <img src="docs/swatches/BBD8FF.svg" alt="#BBD8FF"> `#BBD8FF` | <img src="docs/swatches/9CC9FF.svg" alt="#9CC9FF"> `#9CC9FF` |
+| 1 | red | <img src="docs/swatches/D90000.svg" alt="#D90000"> `#D90000` | <img src="docs/swatches/FFA091.svg" alt="#FFA091"> `#FFA091` | <img src="docs/swatches/FFC3B9.svg" alt="#FFC3B9"> `#FFC3B9` | <img src="docs/swatches/FF5416.svg" alt="#FF5416"> `#FF5416` |
+| 2 | green | <img src="docs/swatches/42C275.svg" alt="#42C275"> `#42C275` | <img src="docs/swatches/A2DDB2.svg" alt="#A2DDB2"> `#A2DDB2` | <img src="docs/swatches/C0E9CB.svg" alt="#C0E9CB"> `#C0E9CB` | <img src="docs/swatches/4CD485.svg" alt="#4CD485"> `#4CD485` |
+| 3 | purple | <img src="docs/swatches/814195.svg" alt="#814195"> `#814195` | <img src="docs/swatches/D2A2E1.svg" alt="#D2A2E1"> `#D2A2E1` | <img src="docs/swatches/E4C2EF.svg" alt="#E4C2EF"> `#E4C2EF` | <img src="docs/swatches/CF8AE3.svg" alt="#CF8AE3"> `#CF8AE3` |
+| 4 | orange | <img src="docs/swatches/DD7B00.svg" alt="#DD7B00"> `#DD7B00` | <img src="docs/swatches/F6BB8D.svg" alt="#F6BB8D"> `#F6BB8D` | <img src="docs/swatches/FCD3B2.svg" alt="#FCD3B2"> `#FCD3B2` | <img src="docs/swatches/ED9E3E.svg" alt="#ED9E3E"> `#ED9E3E` |
+| 5 | yellow | <img src="docs/swatches/EAE00A.svg" alt="#EAE00A"> `#EAE00A` | <img src="docs/swatches/E5E3A6.svg" alt="#E5E3A6"> `#E5E3A6` | <img src="docs/swatches/EDECC2.svg" alt="#EDECC2"> `#EDECC2` | <img src="docs/swatches/E3D03F.svg" alt="#E3D03F"> `#E3D03F` |
+| 6 | pink | <img src="docs/swatches/F835A2.svg" alt="#F835A2"> `#F835A2` | <img src="docs/swatches/FFABCF.svg" alt="#FFABCF"> `#FFABCF` | <img src="docs/swatches/FFCADF.svg" alt="#FFCADF"> `#FFCADF` | <img src="docs/swatches/F670A4.svg" alt="#F670A4"> `#F670A4` |
+| 7 | brown | <img src="docs/swatches/64341D.svg" alt="#64341D"> `#64341D` | <img src="docs/swatches/CC9F8B.svg" alt="#CC9F8B"> `#CC9F8B` | <img src="docs/swatches/E1C0B2.svg" alt="#E1C0B2"> `#E1C0B2` | <img src="docs/swatches/CB8668.svg" alt="#CB8668"> `#CB8668` |
 
 The four categorical palettes use the same eight hues in the same order, so a given index
 refers to the same series in every palette. The `muted` and `fill` colors have low contrast
