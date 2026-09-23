@@ -1,0 +1,4 @@
+\usepackage{fontspec,unicode-math}
+\setmainfont{Erewhon}
+\setsansfont{Fira Sans}
+\setmathfont{Erewhon Math}
