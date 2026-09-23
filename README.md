@@ -37,14 +37,19 @@ import numpy as np
 import matplotlib.pyplot as plt
 import hvb
 
-hvb.use(scale=0.6)          # or hvb.use(scale=0.6, dark=True)
+hvb.use(scale=0.6)
 
 x = np.linspace(0, 10, 200)
 fig, ax = plt.subplots()
 ax.plot(x, np.sin(x), label="sin")
+ax.plot(x, np.cos(x), label="cos")
+ax.set_xlabel("time (s)")
+ax.set_ylabel("signal (V)")
 ax.legend()
-fig.savefig("figure.pdf")   # the frame and legend are styled on save
+fig.savefig("figure.pdf")
 ```
+
+<img src="docs/usage_basic.png" width="60%" alt="Output of the basic example">
 
 `hvb.use()` applies the style globally. The squircle frame, the legend frame, and the tick
 placement are applied when a figure is saved with `fig.savefig` or shown with `plt.show`, not
@@ -60,6 +65,8 @@ The arguments to `hvb.use()` are:
 - `dark`: `True` switches to a `#141414` background with white text and frame, and the `dark`
   palette. A color string sets a different background color.
 - `palette`: the name of the palette used for the color cycle (see below).
+- `font`: the text font, either the name of an installed font or the path to a font file.
+  Math keeps the default math font.
 - `linewidth`: the data line width in points, overriding the width set by `scale`.
 - `grid`: `False` by default. Calling `ax.grid(True)` on an individual axes still turns the
   grid on for that axes.
@@ -72,6 +79,57 @@ The arguments to `hvb.use()` are:
   the rounded bars and error bars.
 
 Polar and 3D axes are left with the default matplotlib frame.
+
+## Examples
+
+A primary line drawn over `muted` context lines with a `fill` band, using the palettes directly:
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+import hvb
+
+hvb.use(scale=0.6)
+muted = hvb.get_hvb_palette("muted")
+fill = hvb.get_hvb_palette("fill")
+default = hvb.get_hvb_palette("default")
+
+x = np.linspace(0, 10, 200)
+fig, ax = plt.subplots()
+for phase in np.linspace(-0.4, 0.4, 7):
+    ax.plot(x, np.sin(x + phase), color=muted[0], linewidth=1)
+ax.fill_between(x, np.sin(x) - 0.3, np.sin(x) + 0.3, color=fill[1], label="band")
+ax.plot(x, np.sin(x), color=default[1], label="mean")
+ax.set_xlabel("time (s)")
+ax.set_ylabel("signal (V)")
+ax.legend()
+fig.savefig("figure.pdf")
+```
+
+<img src="docs/usage_palettes.png" width="60%" alt="Output of the palette example">
+
+Bars and error bars on the dark background, with the text font changed:
+
+```python
+import numpy as np
+import matplotlib.pyplot as plt
+import hvb
+
+hvb.use(scale=0.6, dark=True, font="DejaVu Sans")
+
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9, 3.6), constrained_layout=True)
+ax1.bar(["A", "B", "C", "D"], [3, 5, 2, 4])
+ax1.set_ylabel("counts")
+
+f = np.logspace(0, 3, 9)
+ax2.set_xscale("log")
+ax2.errorbar(f, 1 / np.sqrt(1 + (f / 60) ** 2), yerr=0.05, fmt="o")
+ax2.set_xlabel("frequency (Hz)")
+ax2.set_ylabel("gain")
+fig.savefig("figure.pdf")
+```
+
+<img src="docs/usage_dark.png" width="85%" alt="Output of the dark example">
 
 ## Fonts
 

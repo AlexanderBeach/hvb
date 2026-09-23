@@ -1357,6 +1357,11 @@ def finish_hvb(
 ):
     if ax.name != "rectilinear":
         return ax
+    if not ax.axison:
+        squircle_frame = False
+        for patch in (getattr(ax, "_hvb_frame_fill", None), getattr(ax, "_hvb_frame_border", None)):
+            if patch is not None:
+                patch.set_visible(False)
     if apply_scales:
         apply_hvb_scales(
             ax,
@@ -1382,6 +1387,8 @@ def finish_hvb(
         existing_border = getattr(ax, "_hvb_frame_border", None)
         if existing_fill is not None and existing_border is not None:
             clip_fill = existing_fill
+            existing_fill.set_visible(True)
+            existing_border.set_visible(True)
             _clip_axes_artists(ax, clip_fill, skip=(existing_fill, existing_border))
         else:
             clip_fill, border = squircle_axes_frame(ax, **(frame_kwargs or {}))
@@ -1723,11 +1730,12 @@ def dark_rc(background="#141414", foreground="white", grid="#333333",
 
 
 def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
-        grid=False, exponent=120.0, flat_face_ticks=True, auto=True):
+        font=None, grid=False, exponent=120.0, flat_face_ticks=True, auto=True):
     """Apply the style globally. Figures are finished automatically on save.
 
     `dark` may be True or a background color. `scale` shrinks frame, tick and
-    data-line weights; `text` scales font sizes with it.
+    data-line weights; `text` scales font sizes with it. `font` is a font name
+    or a path to a font file, and replaces the text font but not the math font.
     """
     plt.style.use(["default", get_style_path()])
     mpl.rcParams["axes.grid"] = bool(grid)
@@ -1741,6 +1749,11 @@ def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
         mpl.rcParams.update(dark_rc(background=bg, palette=palette or "dark"))
     elif palette:
         set_hvb_palette(palette)
+    if font:
+        if os.path.isfile(font):
+            font_manager.fontManager.addfont(font)
+            font = font_manager.FontProperties(fname=font).get_name()
+        mpl.rcParams["font.family"] = [font] + mpl.rcParams["font.family"][1:]
     if auto:
         activate_hvb(palette=None, finish_kwargs={
             "flat_face_ticks": flat_face_ticks,
