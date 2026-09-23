@@ -18,4 +18,4 @@ Repository = "https://github.com/AlexanderBeach/hvb"
 packages = ["hvb"]
 
 [tool.setuptools.package-data]
-hvb = ["*.mplstyle"]
+hvb = ["*.mplstyle", "fonts/*"]

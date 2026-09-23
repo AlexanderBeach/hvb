@@ -73,6 +73,16 @@ The arguments to `hvb.use()` are:
 
 Polar and 3D axes are left with the default matplotlib frame.
 
+## Fonts
+
+Text is set in hvb Serif and math (anything between `$` signs) in Fira Sans, a sans-serif font
+designed by Erik Spiekermann and Carrois Apostrophe for Mozilla. Both are bundled in `hvb/fonts`
+under the SIL Open Font License (`OFL-hvbSerif.txt` and `OFL-FiraSans.txt`), so figures look the
+same on any computer without either font being installed. Characters that hvb Serif lacks, such as
+≈ and ∞, are drawn from Fira Sans instead.
+
+hvb Serif is converted from Erewhon, a serif font by Michael Sharpe.
+
 ## Palettes
 
 | name | use |
