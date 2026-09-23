@@ -1,9 +1,12 @@
 """Matplotlib house style: squircle frames, rounded artists and palettes."""
+import os
+
 import numpy as np
 from cycler import cycler
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib import font_manager
 from matplotlib.collections import LineCollection
 from matplotlib.container import BarContainer, ErrorbarContainer
 from matplotlib.axes import Axes
@@ -15,6 +18,15 @@ from matplotlib.path import Path
 from matplotlib.patches import FancyBboxPatch, PathPatch
 from matplotlib.ticker import MaxNLocator, Formatter
 from matplotlib.transforms import Bbox
+
+
+# ----------------------------
+# 0) Fonts
+# ----------------------------
+_FONT_DIR = os.path.join(os.path.dirname(__file__), "fonts")
+for _name in sorted(os.listdir(_FONT_DIR)):
+    if _name.endswith(".ttf"):
+        font_manager.fontManager.addfont(os.path.join(_FONT_DIR, _name))
 
 
 HVB_PALETTES = {

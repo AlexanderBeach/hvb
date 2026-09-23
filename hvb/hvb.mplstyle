@@ -7,9 +7,15 @@ ps.fonttype: 42
 figure.facecolor: white
 axes.facecolor: white
 
-font.family: Segoe UI, DejaVu Sans
+font.family: hvb Serif, Fira Sans, DejaVu Sans
 font.size: 12
 font.weight: normal
+mathtext.fontset: custom
+mathtext.rm: Fira Sans
+mathtext.it: Fira Sans:italic
+mathtext.bf: Fira Sans:bold
+mathtext.sf: Fira Sans
+mathtext.fallback: stixsans
 text.color: 0.13333333333333333
 
 axes.edgecolor: 0.13333333333333333
