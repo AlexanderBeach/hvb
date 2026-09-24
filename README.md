@@ -1,10 +1,10 @@
 # hvb
 
-hvb is a matplotlib house style. It consists of a style file, `hvb.mplstyle`, and helper
-functions that replace the square axes frame with a superellipse (a "squircle," the curve
-|x|^n + |y|^n = 1, which is a rectangle with rounded corners when n is large), round the
+hvb is a matplotlib style suited to my tastes. It consists of a style file, `hvb.mplstyle`, and helper
+functions that replace the square axes frame with a superellipse, round the
 corners of bars, histograms, box plots, violin plots, and error bars, and provide a set of
-categorical color palettes.
+categorical color palettes. Basically, make soft, easy on the eyes plots, that are
+still proessional looking.
 
 <p>
   <img src="docs/example_light.png" width="49%" alt="Four example panels in the light style">
