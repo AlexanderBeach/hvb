@@ -4,7 +4,7 @@ hvb is a matplotlib style suited to my tastes. It consists of a style file, `hvb
 functions that replace the square axes frame with a superellipse, round the
 corners of bars, histograms, box plots, violin plots, and error bars, and provide a set of
 categorical color palettes. Basically, make soft, easy on the eyes plots, that are
-still proessional looking.
+still professional looking.
 
 <p>
   <img src="docs/example_light.png" width="49%" alt="Four example panels in the light style">
