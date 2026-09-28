@@ -43,7 +43,7 @@ TEXT_FONTS = {
 # from `it` (and `bf` when bold), everything else from `rm`; `fallback` covers what
 # none of them has.
 MATH_FONTS = {
-    # Fira Sans throughout, symbols from STIX Sans: the original hvb setup.
+    # Fira Sans throughout, symbols it lacks from STIX Sans: the default.
     "fira": {"rm": "Fira Sans", "it": "Fira Sans:italic", "bf": "Fira Sans:bold",
              "bfit": "Fira Sans:italic:bold", "sf": "Fira Sans", "fallback": "stixsans"},
     # Fira Sans letters with Fira Math's own operators and symbols.
