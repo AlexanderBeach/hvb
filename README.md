@@ -65,8 +65,12 @@ The arguments to `hvb.use()` are:
 - `dark`: `True` switches to a `#141414` background with white text and frame, and the `dark`
   palette. A color string sets a different background color.
 - `palette`: the name of the palette used for the color cycle (see below).
-- `font`: the text font, either the name of an installed font or the path to a font file.
-  Math keeps the default math font.
+- `font`: the text font: one of the bundled names `"serif"` (hvb Serif, the default),
+  `"xcharter"`, `"sans"` (Fira Sans) or `"mono"` (Fira Code), the name of an installed font,
+  or the path to a font file. Math keeps its own font.
+- `math`: the math font setup: one of the bundled names `"fira"` (the default), `"firamath"`,
+  `"erewhon"`, `"xcharter"` or `"euler"` (see Fonts below), or the name of an installed font
+  family, whose regular, italic and bold faces are then used.
 - `linewidth`: the data line width in points, overriding the width set by `scale`.
 - `grid`: `False` by default. Calling `ax.grid(True)` on an individual axes still turns the
   grid on for that axes.
@@ -133,13 +137,39 @@ fig.savefig("figure.pdf")
 
 ## Fonts
 
-Text is set in hvb Serif and math (anything between `$` signs) in Fira Sans, a sans-serif font
-designed by Erik Spiekermann and Carrois Apostrophe for Mozilla. Both are bundled in `hvb/fonts`
-under the SIL Open Font License (`OFL-hvbSerif.txt` and `OFL-FiraSans.txt`), so figures look the
-same on any computer without either font being installed. Characters that hvb Serif lacks, such as
-≈ and ∞, are drawn from Fira Sans instead.
+By default text is set in hvb Serif and math (anything between `$` signs) in Fira Sans, a
+sans-serif font designed by Erik Spiekermann and Carrois Apostrophe for Mozilla. Characters that
+hvb Serif lacks, such as ≈ and ∞, are drawn from Fira Sans instead.
 
-hvb Serif is converted from Erewhon, a serif font by Michael Sharpe.
+Every font is bundled in `hvb/fonts` with its licence, so figures look the same on any computer
+without anything being installed. The text fonts, for `hvb.use(font=...)`:
+
+| name | font | licence |
+|---|---|---|
+| `serif` | hvb Serif, converted from Erewhon by Michael Sharpe (the default) | OFL, `OFL-hvbSerif.txt` |
+| `xcharter` | XCharter, Bitstream Charter extended by Michael Sharpe | Bitstream, `LICENSE-XCharter.txt` |
+| `sans` | Fira Sans | OFL, `OFL-FiraSans.txt` |
+| `mono` | Fira Code, also used for `\mathtt` and the monospace family | OFL, `OFL-FiraCode.txt` |
+
+The math setups, for `hvb.use(math=...)`. Letters and Greek come from the italic and bold faces
+of the text font named; operators, digits and symbols from the math font.
+
+| name | letters | symbols | licence |
+|---|---|---|---|
+| `fira` | Fira Sans | Fira Sans, then STIX Sans (the default) | `OFL-FiraSans.txt` |
+| `firamath` | Fira Sans | Fira Math | `OFL-FiraMath.txt` |
+| `erewhon` | hvb Serif | Erewhon Math, the maths companion of Erewhon | `OFL-ErewhonMath.txt` |
+| `xcharter` | XCharter | XCharter Math | `OFL-XCharterMath.txt` |
+| `euler` | Euler Math, upright | Euler Math | `OFL-EulerMath.txt` |
+
+`euler` sets every letter upright in Hermann Zapf's Euler, the font of *Concrete Mathematics*,
+so variables are told from text by shape rather than by slant.
+
+<img src="docs/usage_fonts.png" width="100%" alt="The six bundled font setups on the same figure">
+
+The math fonts, XCharter and Fira Sans Bold Italic are converted from their OpenType originals to
+TrueType, as hvb Serif is, so that matplotlib embeds them as outlines in PDF output
+(`pdf.fonttype: 42`).
 
 ## Palettes
 

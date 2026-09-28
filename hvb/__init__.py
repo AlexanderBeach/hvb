@@ -28,6 +28,56 @@ for _name in sorted(os.listdir(_FONT_DIR)):
     if _name.endswith(".ttf"):
         font_manager.fontManager.addfont(os.path.join(_FONT_DIR, _name))
 
+# Bundled text fonts, by the short names `hvb.use(font=...)` accepts.
+TEXT_FONTS = {
+    "serif": "hvb Serif",
+    "erewhon": "hvb Serif",
+    "xcharter": "XCharter",
+    "sans": "Fira Sans",
+    "fira": "Fira Sans",
+    "mono": "Fira Code",
+    "firacode": "Fira Code",
+}
+
+# Bundled math setups, by the short names `hvb.use(math=...)` accepts. Letters come
+# from `it` (and `bf` when bold), everything else from `rm`; `fallback` covers what
+# none of them has.
+MATH_FONTS = {
+    # Fira Sans throughout, symbols from STIX Sans: the original hvb setup.
+    "fira": {"rm": "Fira Sans", "it": "Fira Sans:italic", "bf": "Fira Sans:bold",
+             "bfit": "Fira Sans:italic:bold", "sf": "Fira Sans", "fallback": "stixsans"},
+    # Fira Sans letters with Fira Math's own operators and symbols.
+    "firamath": {"rm": "Fira Math", "it": "Fira Sans:italic", "bf": "Fira Sans:bold",
+                 "bfit": "Fira Sans:italic:bold", "sf": "Fira Math", "fallback": "stixsans"},
+    # Serif math matching hvb Serif: Erewhon Math symbols, hvb Serif italic letters.
+    "erewhon": {"rm": "Erewhon Math", "it": "hvb Serif:italic", "bf": "hvb Serif:bold",
+                "bfit": "hvb Serif:italic:bold", "sf": "Fira Sans", "fallback": "stix"},
+    # Serif math matching XCharter.
+    "xcharter": {"rm": "XCharter Math", "it": "XCharter:italic", "bf": "XCharter:bold",
+                 "bfit": "XCharter:italic:bold", "sf": "Fira Sans", "fallback": "stix"},
+    # Euler: upright calligraphic letters and Greek, as in Concrete Mathematics.
+    "euler": {"rm": "Euler Math", "it": "Euler Math", "bf": "Euler Math",
+              "bfit": "Euler Math", "sf": "Fira Sans", "fallback": "stix"},
+}
+
+
+def math_rc(math):
+    """rcParams selecting a math font setup: a name from MATH_FONTS, or a font family."""
+    if math in MATH_FONTS:
+        spec = MATH_FONTS[math]
+    else:
+        spec = {"rm": math, "it": math + ":italic", "bf": math + ":bold",
+                "bfit": math + ":italic:bold", "sf": "Fira Sans", "fallback": "stix"}
+    return {
+        "mathtext.fontset": "custom",
+        "mathtext.rm": spec["rm"],
+        "mathtext.it": spec["it"],
+        "mathtext.bf": spec["bf"],
+        "mathtext.bfit": spec["bfit"],
+        "mathtext.sf": spec["sf"],
+        "mathtext.fallback": spec["fallback"],
+    }
+
 
 HVB_PALETTES = {
     # Data lines on a white background.
@@ -1730,12 +1780,15 @@ def dark_rc(background="#141414", foreground="white", grid="#333333",
 
 
 def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
-        font=None, grid=False, exponent=120.0, flat_face_ticks=True, auto=True):
+        font=None, math=None, grid=False, exponent=120.0, flat_face_ticks=True,
+        auto=True):
     """Apply the style globally. Figures are finished automatically on save.
 
     `dark` may be True or a background color. `scale` shrinks frame, tick and
-    data-line weights; `text` scales font sizes with it. `font` is a font name
-    or a path to a font file, and replaces the text font but not the math font.
+    data-line weights; `text` scales font sizes with it. `font` is one of the
+    bundled names in TEXT_FONTS, a font name, or a path to a font file, and
+    replaces the text font but not the math font. `math` is one of the bundled
+    setups in MATH_FONTS, or a font family, and replaces the math font.
     """
     plt.style.use(["default", get_style_path()])
     mpl.rcParams["axes.grid"] = bool(grid)
@@ -1750,10 +1803,14 @@ def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
     elif palette:
         set_hvb_palette(palette)
     if font:
-        if os.path.isfile(font):
+        if font in TEXT_FONTS:
+            font = TEXT_FONTS[font]
+        elif os.path.isfile(font):
             font_manager.fontManager.addfont(font)
             font = font_manager.FontProperties(fname=font).get_name()
         mpl.rcParams["font.family"] = [font] + mpl.rcParams["font.family"][1:]
+    if math:
+        mpl.rcParams.update(math_rc(math))
     if auto:
         activate_hvb(palette=None, finish_kwargs={
             "flat_face_ticks": flat_face_ticks,
