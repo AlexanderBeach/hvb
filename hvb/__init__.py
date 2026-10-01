@@ -6,18 +6,18 @@ from cycler import cycler
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
-from matplotlib import font_manager
+from matplotlib import font_manager, patheffects
 from matplotlib.collections import LineCollection
 from matplotlib.container import BarContainer, ErrorbarContainer
 from matplotlib.axes import Axes
 from matplotlib.figure import Figure
-from functools import wraps
+from functools import lru_cache, wraps
 from matplotlib.lines import Line2D
 from matplotlib.offsetbox import DrawingArea
 from matplotlib.path import Path
 from matplotlib.patches import FancyBboxPatch, PathPatch
 from matplotlib.ticker import MaxNLocator, Formatter
-from matplotlib.transforms import Bbox
+from matplotlib.transforms import Bbox, TransformedPatchPath
 
 
 # ----------------------------
@@ -282,6 +282,48 @@ def _superellipse_unit_vertices(exponent=70.0, npts=1600):
     return np.column_stack([X, Y])
 
 
+@lru_cache(maxsize=None)
+def _superellipse_frame_vertices(exponent, tol=1e-5):
+    """Fewest vertices within `tol` of the superellipse, in unit coordinates.
+
+    The axes frame is also the clip path of every artist inside it, and the PDF
+    backend writes the clip path out again and again, so its size matters.
+    """
+    # Douglas-Peucker on one densely sampled quadrant, mirrored to the others
+    t = np.linspace(0, np.pi / 2, 20001)
+    q = np.column_stack([np.cos(t) ** (2.0 / exponent), np.sin(t) ** (2.0 / exponent)])
+    keep = np.zeros(len(q), dtype=bool)
+    keep[[0, -1]] = True
+    spans = [(0, len(q) - 1)]
+    while spans:
+        a, b = spans.pop()
+        if b - a < 2:
+            continue
+        chord = q[b] - q[a]
+        rel = q[a + 1:b] - q[a]
+        dist = np.abs(chord[0] * rel[:, 1] - chord[1] * rel[:, 0]) / np.hypot(*chord)
+        i = int(np.argmax(dist))
+        if dist[i] > tol:
+            keep[a + 1 + i] = True
+            spans += [(a, a + 1 + i), (a + 1 + i, b)]
+    q = q[keep]  # (1, 0) to (0, 1)
+    quadrants = [q, q[::-1][1:] * [-1, 1], q[1:] * [-1, -1], q[::-1][1:-1] * [1, -1]]
+    verts = (np.vstack(quadrants) + 1) / 2
+    verts.setflags(write=False)
+    return verts
+
+
+def _shared_clip(clip_patch):
+    """One clip object per patch, so the PDF backend writes it once per run of artists."""
+    if isinstance(clip_patch, mpatches.Rectangle):
+        return clip_patch  # matplotlib turns a Rectangle into a cheaper clip box
+    clip = getattr(clip_patch, "_hvb_shared_clip", None)
+    if clip is None:
+        clip = TransformedPatchPath(clip_patch)
+        clip_patch._hvb_shared_clip = clip
+    return clip
+
+
 def _path_from_vertices(verts_xy):
     codes = np.full(len(verts_xy), Path.LINETO, dtype=np.uint8)
     codes[0] = Path.MOVETO
@@ -290,30 +332,37 @@ def _path_from_vertices(verts_xy):
     return Path(verts2, codes2)
 
 
-def _clip_tick_elements(ax, clip_patch):
+def _clip_tick_elements(ax, clip):
     for tick in ax.xaxis.get_major_ticks() + ax.xaxis.get_minor_ticks():
         for artist in (tick.tick1line, tick.tick2line, tick.gridline):
-            artist.set_clip_path(clip_patch)
+            artist.set_clip_path(clip)
     for tick in ax.yaxis.get_major_ticks() + ax.yaxis.get_minor_ticks():
         for artist in (tick.tick1line, tick.tick2line, tick.gridline):
-            artist.set_clip_path(clip_patch)
+            artist.set_clip_path(clip)
+        # Agg drops the antialiasing of a horizontal marker clipped to a path, so
+        # y ticks would draw heavier than x ticks. Any path effect makes Agg draw
+        # the marker as a plain path, which it antialiases correctly.
+        for artist in (tick.tick1line, tick.tick2line):
+            if not artist.get_path_effects():
+                artist.set_path_effects([patheffects.Normal()])
 
 
 def _clip_axes_artists(ax, clip_patch, skip=()):
+    clip = _shared_clip(clip_patch)
     skip_ids = {id(obj) for obj in skip}
     for artist in list(ax.lines) + list(ax.collections) + list(ax.images) + list(ax.patches):
         if id(artist) in skip_ids:
             continue
         if hasattr(artist, "set_clip_path"):
-            artist.set_clip_path(clip_patch)
+            artist.set_clip_path(clip)
     for artist in ax.artists:
         if id(artist) in skip_ids:
             continue
         if hasattr(artist, "set_clip_path"):
-            artist.set_clip_path(clip_patch)
-    _clip_tick_elements(ax, clip_patch)
+            artist.set_clip_path(clip)
+    _clip_tick_elements(ax, clip)
     for gl in ax.get_xgridlines() + ax.get_ygridlines():
-        gl.set_clip_path(clip_patch)
+        gl.set_clip_path(clip)
 
 
 def squircle_axes_frame(
@@ -337,7 +386,7 @@ def squircle_axes_frame(
     for spine in ax.spines.values():
         spine.set_visible(False)
 
-    verts = _superellipse_unit_vertices(exponent=exponent, npts=1600)
+    verts = _superellipse_frame_vertices(float(exponent)).copy()
     verts[:, 0] = inset + (1 - 2 * inset) * verts[:, 0]
     verts[:, 1] = inset + (1 - 2 * inset) * verts[:, 1]
     path = _path_from_vertices(verts)
@@ -1108,6 +1157,9 @@ def style_hvb_errorbar(err_container, ax=None, capsize=None, line_kwargs=None, c
         capsize = float(mpl.rcParams.get("errorbar.capsize", 5.0))
     if line_kwargs is None:
         line_kwargs = {}
+
+    if isinstance(clip_path, mpatches.Patch):
+        clip_path = _shared_clip(clip_path)
 
     base_lw = None
     base_color = None
