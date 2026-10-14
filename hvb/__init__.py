@@ -1,9 +1,11 @@
 """Matplotlib house style: squircle frames, rounded artists and palettes."""
+import dataclasses
 import os
 
 import numpy as np
 from cycler import cycler
 import matplotlib as mpl
+import matplotlib.axis as maxis
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib import font_manager, patheffects
@@ -28,13 +30,24 @@ for _name in sorted(os.listdir(_FONT_DIR)):
     if _name.endswith(".ttf"):
         font_manager.fontManager.addfont(os.path.join(_FONT_DIR, _name))
 
+# The sans is FiraGO at its Book weight, which matplotlib files under "FiraGO" at
+# weight 350, so a plain "FiraGO" would find Regular wherever FiraGO is installed.
+# The Book faces, with Bold for bold, are listed again as the family "FiraGO Book".
+for _name, _weight in [("FiraGO-Book.ttf", 400), ("FiraGO-BookItalic.ttf", 400),
+                       ("FiraGO-Bold.ttf", 700), ("FiraGO-BoldItalic.ttf", 700)]:
+    _entry = font_manager.ttfFontProperty(font_manager.get_font(os.path.join(_FONT_DIR, _name)))
+    font_manager.fontManager.ttflist.append(
+        dataclasses.replace(_entry, name="FiraGO Book", weight=_weight))
+
 # Bundled text fonts, by the short names `hvb.use(font=...)` accepts.
 TEXT_FONTS = {
     "serif": "hvb Serif",
     "erewhon": "hvb Serif",
     "xcharter": "XCharter",
-    "sans": "Fira Sans",
-    "fira": "Fira Sans",
+    "sans": "FiraGO Book",
+    "fira": "FiraGO Book",
+    "firago": "FiraGO Book",
+    "atkinson": "Atkinson Hyperlegible Next",
     "mono": "Fira Code",
     "firacode": "Fira Code",
 }
@@ -43,21 +56,27 @@ TEXT_FONTS = {
 # from `it` (and `bf` when bold), everything else from `rm`; `fallback` covers what
 # none of them has.
 MATH_FONTS = {
-    # Fira Sans throughout, symbols it lacks from STIX Sans: the default.
-    "fira": {"rm": "Fira Sans", "it": "Fira Sans:italic", "bf": "Fira Sans:bold",
-             "bfit": "Fira Sans:italic:bold", "sf": "Fira Sans", "fallback": "stixsans"},
-    # Fira Sans letters with Fira Math's own operators and symbols.
-    "firamath": {"rm": "Fira Math", "it": "Fira Sans:italic", "bf": "Fira Sans:bold",
-                 "bfit": "Fira Sans:italic:bold", "sf": "Fira Math", "fallback": "stixsans"},
+    # FiraGO throughout, symbols it lacks from STIX Sans: the default.
+    "fira": {"rm": "FiraGO Book", "it": "FiraGO Book:italic", "bf": "FiraGO Book:bold",
+             "bfit": "FiraGO Book:italic:bold", "sf": "FiraGO Book", "fallback": "stixsans"},
+    # FiraGO letters with Fira Math's own operators and symbols.
+    "firamath": {"rm": "Fira Math", "it": "FiraGO Book:italic", "bf": "FiraGO Book:bold",
+                 "bfit": "FiraGO Book:italic:bold", "sf": "Fira Math", "fallback": "stixsans"},
     # Serif math matching hvb Serif: Erewhon Math symbols, hvb Serif italic letters.
     "erewhon": {"rm": "Erewhon Math", "it": "hvb Serif:italic", "bf": "hvb Serif:bold",
-                "bfit": "hvb Serif:italic:bold", "sf": "Fira Sans", "fallback": "stix"},
+                "bfit": "hvb Serif:italic:bold", "sf": "FiraGO Book", "fallback": "stix"},
     # Serif math matching XCharter.
     "xcharter": {"rm": "XCharter Math", "it": "XCharter:italic", "bf": "XCharter:bold",
-                 "bfit": "XCharter:italic:bold", "sf": "Fira Sans", "fallback": "stix"},
+                 "bfit": "XCharter:italic:bold", "sf": "FiraGO Book", "fallback": "stix"},
     # Euler: upright calligraphic letters and Greek, as in Concrete Mathematics.
     "euler": {"rm": "Euler Math", "it": "Euler Math", "bf": "Euler Math",
-              "bfit": "Euler Math", "sf": "Fira Sans", "fallback": "stix"},
+              "bfit": "Euler Math", "sf": "FiraGO Book", "fallback": "stix"},
+    # Atkinson Hyperlegible Next throughout. Its only Greek is Δ, Ω, μ and π; the rest
+    # comes from STIX Sans.
+    "atkinson": {"rm": "Atkinson Hyperlegible Next", "it": "Atkinson Hyperlegible Next:italic",
+                 "bf": "Atkinson Hyperlegible Next:bold",
+                 "bfit": "Atkinson Hyperlegible Next:italic:bold",
+                 "sf": "Atkinson Hyperlegible Next", "fallback": "stixsans"},
 }
 
 
@@ -67,7 +86,7 @@ def math_rc(math):
         spec = MATH_FONTS[math]
     else:
         spec = {"rm": math, "it": math + ":italic", "bf": math + ":bold",
-                "bfit": math + ":italic:bold", "sf": "Fira Sans", "fallback": "stix"}
+                "bfit": math + ":italic:bold", "sf": "FiraGO Book", "fallback": "stix"}
     return {
         "mathtext.fontset": "custom",
         "mathtext.rm": spec["rm"],
@@ -266,6 +285,56 @@ def apply_hvb_scales(
             y_formatter=y_formatter,
         )
     return ax
+
+
+# Length of the mid-decade minor ticks of a log axis, as a fraction of the way from
+# the minor tick length (0) to the major (1): 5.8 pt between the 4.5 pt minor and
+# 6.7 pt major ticks of scale_rc.
+MID_DECADE_TICK = 0.59
+
+
+def _tick_length(axis, which):
+    """Length in points the axis's ticks were made with, from rcParams or tick_params.
+
+    Read from the ticks rather than rcParams, which may have changed since the
+    figure was made, and which have no entry for polar axes.
+    """
+    ticks = axis.get_minor_ticks(1) if which == "minor" else axis.get_major_ticks(1)
+    return float(ticks[0]._size)
+
+
+def size_mid_decade_ticks(axis, fraction=None):
+    """Lengthen the minor ticks at half the base in each decade of a log axis.
+
+    That is 5, 50, 500 for base 10 and 8, 128, 2048 for base 16. With matplotlib's
+    default minor ticks only even bases above 2 have a tick there. Symlog axes are
+    treated the same on both sides of zero. `fraction` defaults to MID_DECADE_TICK.
+
+    Every other minor tick is reset to the minor length, since matplotlib reuses
+    tick objects as the view changes and the tick at 5 before a zoom may be at 3
+    after it.
+    """
+    locs = np.asarray(axis.get_minorticklocs(), dtype=float)
+    if locs.size == 0:
+        return axis
+    minor = _tick_length(axis, "minor")
+    mid = minor
+    base = None
+    if axis.get_scale() in ("log", "symlog"):
+        base = getattr(axis.get_transform(), "base", None)
+    # minor ticks hidden with length 0 stay hidden, and none is made shorter
+    if base is not None and base > 2 and minor > 0:
+        fraction = MID_DECADE_TICK if fraction is None else float(fraction)
+        mid = minor + fraction * max(_tick_length(axis, "major") - minor, 0.0)
+    for tick, loc in zip(axis.get_minor_ticks(len(locs)), locs):
+        size = minor
+        if mid != minor and loc != 0:
+            mantissa = abs(loc) / base ** np.floor(np.log(abs(loc)) / np.log(base) + 1e-9)
+            if np.isclose(mantissa, base / 2):
+                size = mid
+        tick.tick1line.set_markersize(size)
+        tick.tick2line.set_markersize(size)
+    return axis
 
 
 # ----------------------------
@@ -1744,6 +1813,14 @@ def activate_hvb(
             return cbar
         return _wrapped_colorbar
 
+    def wrap_axis_draw(original):
+        @wraps(original)
+        def _wrapped_axis_draw(self, *args, **kwargs):
+            if _hvb_runtime_config():
+                size_mid_decade_ticks(self)
+            return original(self, *args, **kwargs)
+        return _wrapped_axis_draw
+
     _hvb_patch(plt, "show", wrap_show)
     _hvb_patch(Figure, "savefig", wrap_savefig)
     _hvb_patch(Axes, "bar", wrap_bar)
@@ -1755,6 +1832,7 @@ def activate_hvb(
     _hvb_patch(Axes, "legend", wrap_legend)
     _hvb_patch(Axes, "imshow", wrap_imshow)
     _hvb_patch(Figure, "colorbar", wrap_colorbar)
+    _hvb_patch(maxis.Axis, "draw", wrap_axis_draw)
 
     return _HVB_RUNTIME["config"]
 
@@ -1778,7 +1856,7 @@ def deactivate_hvb():
     return None
 
 
-def scale_rc(scale=1.0, text=False, tick_size=(6.7, 3.5)):
+def scale_rc(scale=1.0, text=False, tick_size=(6.7, 4.5)):
     """rcParams scaling the style for a smaller figure.
 
     `text` may be True, False, or a separate factor. `tick_size` is in points.
