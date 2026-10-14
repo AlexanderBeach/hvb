@@ -56,6 +56,12 @@ placement are applied when a figure is saved with `fig.savefig` or shown with `p
 when it is drawn, so a figure rendered with `fig.canvas.draw()` alone will still have the
 default matplotlib frame.
 
+On a logarithmic axis, the minor ticks at half the base in each decade (5, 50, 500, ... for
+base 10, 8, 128, ... for base 16) are drawn longer than the other minor ticks; with `scale`
+set, they are 5.8 pt, between the 4.5 pt minor and 6.7 pt decade ticks (8.65 pt between 6.7
+and 10 pt without it). `hvb.MID_DECADE_TICK` sets where they fall, from 0 (the minor tick
+length) to 1 (the major).
+
 The arguments to `hvb.use()` are:
 
 - `scale`: multiplies the frame, tick, grid, and data line widths, for figures smaller than
@@ -66,11 +72,12 @@ The arguments to `hvb.use()` are:
   palette. A color string sets a different background color.
 - `palette`: the name of the palette used for the color cycle (see below).
 - `font`: the text font. One of the bundled names `"serif"` (hvb Serif, the default),
-  `"xcharter"`, `"sans"` (Fira Sans) or `"mono"` (Fira Code), the name of an installed font,
-  or the path to a font file. Math keeps its own font.
+  `"xcharter"`, `"sans"` (FiraGO Book), `"atkinson"` (Atkinson Hyperlegible Next) or `"mono"`
+  (Fira Code), the name of an installed font, or the path to a font file. Math keeps its own
+  font.
 - `math`: the math font. One of the bundled setups `"fira"` (the default), `"firamath"`,
-  `"erewhon"`, `"xcharter"` or `"euler"`, described under Fonts, or the name of an installed
-  font family, whose regular, italic and bold faces are used.
+  `"erewhon"`, `"xcharter"`, `"euler"` or `"atkinson"`, described under Fonts, or the name of
+  an installed font family, whose regular, italic and bold faces are used.
 - `linewidth`: the data line width in points, overriding the width set by `scale`.
 - `grid`: `False` by default. Calling `ax.grid(True)` on an individual axes still turns the
   grid on for that axes.
@@ -79,8 +86,8 @@ The arguments to `hvb.use()` are:
   whatever the size of the legend.
 - `flat_face_ticks`: `True` by default, which hides any tick that would land on a rounded
   corner of the frame rather than on a straight edge.
-- `auto`: `False` sets the rcParams only, without the squircle frame, the legend styling, or
-  the rounded bars and error bars.
+- `auto`: `False` sets the rcParams only, without the squircle frame, the legend styling, the
+  rounded bars and error bars, or the longer mid-decade ticks.
 
 Polar and 3D axes are left with the default matplotlib frame.
 
@@ -137,7 +144,7 @@ fig.savefig("figure.pdf")
 
 ## Fonts
 
-Text is set in hvb Serif and math (anything between `$` signs) in Fira Sans unless
+Text is set in hvb Serif and math (anything between `$` signs) in FiraGO Book unless
 `hvb.use()` is told otherwise. Every font hvb can use is bundled in `hvb/fonts` with its
 licence, so figures look the same on any computer without anything being installed, and
 PDF output embeds the fonts as outlines.
@@ -148,25 +155,34 @@ The text fonts, chosen with `hvb.use(font=...)`:
 |---|---|---|
 | `serif` | hvb Serif, a TrueType version of Erewhon by Michael Sharpe | OFL, `OFL-hvbSerif.txt` |
 | `xcharter` | XCharter, Bitstream Charter extended by Michael Sharpe | Bitstream, `LICENSE-XCharter.txt` |
-| `sans` | Fira Sans, by Erik Spiekermann and Carrois Apostrophe for Mozilla | OFL, `OFL-FiraSans.txt` |
+| `sans` | FiraGO Book, Erik Spiekermann's Fira Sans extended by Carrois and bBox Type | OFL, `OFL-FiraGO.txt` |
+| `atkinson` | Atkinson Hyperlegible Next, by the Braille Institute and Applied Design Works | OFL, `OFL-AtkinsonHyperlegibleNext.txt` |
 | `mono` | Fira Code, which is also the monospace family and `\mathtt` | OFL, `OFL-FiraCode.txt` |
+
+FiraGO Book is a shade lighter than FiraGO Regular, and takes FiraGO Bold for bold. hvb lists
+the two as the family `FiraGO Book`, which any matplotlib font setting accepts by that name.
+Atkinson Hyperlegible Next is drawn for low vision: letters that are easily confused, such as
+I, l and 1 or O and 0, are made distinct. Its only Greek letters are Δ, Ω, μ and π, and it
+has no µ sign or arrows; in a label that also contains math, write those inside the `$` signs,
+as in `$\mu$m`, since the text outside them cannot fall back to another font.
 
 The math setups, chosen with `hvb.use(math=...)`. Letters and Greek are taken from the italic
 and bold faces of the text font named; operators, digits and symbols from the math font.
 
 | name | letters | symbols | licence |
 |---|---|---|---|
-| `fira` | Fira Sans | Fira Sans, then STIX Sans | `OFL-FiraSans.txt` |
-| `firamath` | Fira Sans | Fira Math | `OFL-FiraMath.txt` |
+| `fira` | FiraGO Book | FiraGO Book, then STIX Sans | `OFL-FiraGO.txt` |
+| `firamath` | FiraGO Book | Fira Math | `OFL-FiraMath.txt` |
 | `erewhon` | hvb Serif | Erewhon Math | `OFL-ErewhonMath.txt` |
 | `xcharter` | XCharter | XCharter Math | `OFL-XCharterMath.txt` |
 | `euler` | Euler Math, upright | Euler Math | `OFL-EulerMath.txt` |
+| `atkinson` | Atkinson Hyperlegible Next, Greek from STIX Sans | Atkinson Hyperlegible Next, then STIX Sans | `OFL-AtkinsonHyperlegibleNext.txt` |
 
 `euler` sets every letter upright in Hermann Zapf's Euler, the font of *Concrete Mathematics*,
 so variables are told from text by shape rather than by slant. Characters a text font lacks,
 such as ≈ and ∞ in hvb Serif, are drawn from the next font in the family list.
 
-<img src="docs/usage_fonts.png" width="100%" alt="The six bundled font setups on the same figure">
+<img src="docs/usage_fonts.png" width="100%" alt="The bundled text fonts and math setups on the same figure">
 
 ## Palettes
 
@@ -204,3 +220,5 @@ and `finish_hvb_figure(fig, ...)` does the same for every axes in a figure, incl
 axes and figure legends. `scale_rc()` and `dark_rc()` return the dictionaries of rcParams that
 `hvb.use()` applies, so they can be layered over the style file with `plt.style.context`.
 `ticks_on_flat_faces(ax)` hides the ticks that would fall on a rounded corner of the frame.
+`size_mid_decade_ticks(ax.xaxis, fraction)` sets the minor tick lengths of one axis; after
+`hvb.use()` it runs whenever an axis is drawn, with `hvb.MID_DECADE_TICK` as the fraction.
