@@ -87,7 +87,8 @@ The arguments to `hvb.use()` are:
 - `flat_face_ticks`: `True` by default, which hides any tick that would land on a rounded
   corner of the frame rather than on a straight edge.
 - `auto`: `False` sets the rcParams only, without the squircle frame, the legend styling, the
-  rounded bars and error bars, or the longer mid-decade ticks.
+  rounded bars and error bars, or the longer mid-decade ticks, and switches these off if an
+  earlier `hvb.use()` turned them on.
 
 Polar and 3D axes are left with the default matplotlib frame.
 
