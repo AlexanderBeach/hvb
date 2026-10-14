@@ -62,6 +62,16 @@ set, they are 5.8 pt, between the 4.5 pt minor and 6.7 pt decade ticks (8.65 pt 
 and 10 pt without it). `hvb.MID_DECADE_TICK` sets where they fall, from 0 (the minor tick
 length) to 1 (the major).
 
+A legend left at matplotlib's default `loc="best"` is moved off the plot when the figure is
+saved or shown. matplotlib's `"best"` tries only nine fixed spots and counts data points rather
+than the area they cover, so its choice can still sit on a fill, a dense line or a label. hvb
+starts from that spot and moves the legend to the nearest spot inside the frame that is covered
+less, counting every artist drawn in the axes, including lines, fills, scatter points, text,
+annotations and inset axes. If no spot is clear enough, the top of the y-range is raised just
+enough to make one, by at most 60% of the axes height. A y-range set with `ax.set_ylim` or
+shared with another axes is never changed, and a legend given an explicit `loc`, or added to
+the figure rather than an axes, is left where it was put.
+
 The arguments to `hvb.use()` are:
 
 - `scale`: multiplies the frame, tick, grid, and data line widths, for figures smaller than
@@ -86,6 +96,12 @@ The arguments to `hvb.use()` are:
   whatever the size of the legend.
 - `flat_face_ticks`: `True` by default, which hides any tick that would land on a rounded
   corner of the frame rather than on a straight edge.
+- `legend_strictness`: how far legends are moved off the plot, from 0 to 1. A legend may be
+  covered by `1 - legend_strictness` times as much of the plot as at matplotlib's spot, so 0
+  keeps matplotlib's `loc="best"`, 0.5 halves the overlap it has there, and 1, the default,
+  lets nothing touch the legend or the small clearance kept around it. The clearance grows with
+  the strictness, and values in between move the legend, or raise the y-range, by amounts in
+  between.
 - `auto`: `False` sets the rcParams only, without the squircle frame, the legend styling, the
   rounded bars and error bars, or the longer mid-decade ticks, and switches these off if an
   earlier `hvb.use()` turned them on.
@@ -223,3 +239,6 @@ axes and figure legends. `scale_rc()` and `dark_rc()` return the dictionaries of
 `ticks_on_flat_faces(ax)` hides the ticks that would fall on a rounded corner of the frame.
 `size_mid_decade_ticks(ax.xaxis, fraction)` sets the minor tick lengths of one axis; after
 `hvb.use()` it runs whenever an axis is drawn, with `hvb.MID_DECADE_TICK` as the fraction.
+`place_legend(leg, strictness)` places one axes legend as described above and returns the
+fraction of its area left covered. `finish_hvb` takes the same `legend_strictness`, and
+`hvb.LEGEND_STRICTNESS` sets the default for both.

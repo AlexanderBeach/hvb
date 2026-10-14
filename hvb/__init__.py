@@ -8,6 +8,7 @@ import matplotlib as mpl
 import matplotlib.axis as maxis
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+import matplotlib.spines as mspines
 from matplotlib import font_manager, patheffects
 from matplotlib.collections import LineCollection
 from matplotlib.container import BarContainer, ErrorbarContainer
@@ -666,6 +667,217 @@ def style_hvb_legend(
     if style_errorbars:
         style_hvb_errorbar_legend(leg)
     return leg
+
+
+# ----------------------------
+# 3b) Legend placement
+# ----------------------------
+# How strictly finish_hvb keeps legends off the data, from 0 to 1. See place_legend.
+LEGEND_STRICTNESS = 1.0
+
+# Space kept clear around a legend frame at strictness 1, in units of the legend font size.
+LEGEND_CLEARANCE = 0.4
+
+# Width in pixels the axes are rendered at to find the ink a legend would cover.
+_INK_MAP_WIDTH = 480
+
+# Bisection steps when finding how far to raise the y-range, enough for 0.1% of the height.
+_ROOM_STEPS = 10
+
+
+def _legend_obstacles(ax, leg):
+    """Artists in `ax` a legend should not cover: all but the axes, frame and titles."""
+    skip = {id(leg), id(ax.patch), id(getattr(ax, "_hvb_frame_fill", None)),
+            id(getattr(ax, "_hvb_frame_border", None)),
+            id(ax.title), id(ax._left_title), id(ax._right_title)}
+    skip |= {id(child) for child in ax.child_axes}
+    artists = [a for a in ax.get_children()
+               if id(a) not in skip and a.get_visible()
+               and not isinstance(a, (maxis.Axis, mspines.Spine))]
+    return sorted(artists, key=lambda a: a.get_zorder())
+
+
+def _figure_renderer(fig):
+    from matplotlib.backends.backend_agg import RendererAgg
+    return RendererAgg(int(np.ceil(fig.bbox.width)), int(np.ceil(fig.bbox.height)), fig.dpi)
+
+
+def _ink_map(ax, leg):
+    """Opacity (0 to 1) of everything drawn in `ax` but `leg`, rows bottom-up."""
+    renderer = _figure_renderer(ax.figure)
+    for artist in _legend_obstacles(ax, leg):
+        artist.draw(renderer)
+    ink = np.asarray(renderer.buffer_rgba())[::-1, :, 3] / 255.0
+    for child in ax.child_axes:  # inset axes count as solid
+        bb = child.get_window_extent()
+        ink[int(bb.y0):int(np.ceil(bb.y1)), int(bb.x0):int(np.ceil(bb.x1))] = 1.0
+    x0, y0 = int(round(ax.bbox.x0)), int(round(ax.bbox.y0))
+    return ink[y0:y0 + int(round(ax.bbox.height)), x0:x0 + int(round(ax.bbox.width))]
+
+
+def _legend_geometry(leg, ax):
+    """The legend box where loc="best" puts it, and its frame, as (x0, y0, x1, y1) axes fractions.
+
+    Measured at the figure's own resolution, since text and handle sizes round differently
+    on the low-resolution render.
+    """
+    from matplotlib.backends.backend_agg import RendererAgg
+    renderer = RendererAgg(1, 1, ax.figure.dpi)  # sizes text without drawing anything
+    box = leg._legend_box.get_window_extent(renderer)
+    patch = leg.legendPatch
+    patch.set_bounds(box.bounds)
+    patch.set_mutation_scale(renderer.points_to_pixels(leg._fontsize))
+    frame = patch.get_path().get_extents(patch.get_transform())
+    to_axes = ax.transAxes.inverted()
+    return (to_axes.transform([[box.x0, box.y0], [box.x1, box.y1]]).ravel(),
+            to_axes.transform([[frame.x0, frame.y0], [frame.x1, frame.y1]]).ravel())
+
+
+def _squeeze_rows(ink, squeeze):
+    """The ink map with its rows pressed toward the bottom by `squeeze`, as a lower y-top would."""
+    H = ink.shape[0]
+    rows = np.arange(int(np.ceil(H * squeeze)))
+    first = np.minimum((rows / squeeze).astype(int), H - 1)
+    last = np.minimum(((rows + 1) / squeeze).astype(int), H) - 1
+    out = np.zeros_like(ink)
+    # each row keeps the darkest of the rows pressed into it, so thin lines do not vanish
+    out[:rows.size] = ink[first]
+    for step in range(1, int(np.ceil(1 / squeeze)) + 1):
+        out[:rows.size] = np.maximum(out[:rows.size], ink[np.minimum(first + step, last)])
+    return out
+
+
+def _settle_layout(fig):
+    """Run the figure's layout engine, if it has one, so the axes are where they will be drawn."""
+    from matplotlib.layout_engine import PlaceHolderLayoutEngine
+    engine = fig.get_layout_engine()
+    if engine is not None and not isinstance(engine, PlaceHolderLayoutEngine):
+        fig.draw_without_rendering()
+
+
+def _place_axes_legends(axes, strictness):
+    """Place the legends of `axes` left at loc="best", or placed by hvb before."""
+    legends = [leg for leg in (ax.get_legend() for ax in axes)
+               if leg is not None and (leg._loc == 0 or getattr(leg, "_hvb_placed", False))]
+    if legends:
+        _settle_layout(legends[0].figure)
+    for leg in legends:
+        place_legend(leg, strictness=strictness, _settled=True)
+
+
+def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_room=0.6,
+                 _settled=False):
+    """Move an axes legend off the plot by `strictness`, starting from matplotlib's "best".
+
+    Every drawn artist in the axes counts as plot, including fills, text, annotations,
+    other legends and inset axes. The legend may be covered by (1 - strictness) times as
+    much as at the spot loc="best" picks, and goes to the nearest spot that meets this.
+    If no spot does, the top of the y-range is raised just enough to make one.
+
+    :param leg: the legend of an axes.
+    :param strictness: from 0 to 1. 0 leaves the legend to matplotlib's loc="best", 0.5
+        allows half the overlap it has there, and 1 none, nor in the clearance around it.
+        None uses LEGEND_STRICTNESS.
+    :param clearance: the space kept clear around the frame, in units of the legend font
+        size. None uses LEGEND_CLEARANCE times the strictness.
+    :param make_room: True raises the top of the y-range when no spot is clear enough,
+        squeezing the data down. "auto" does this only when the y-range is autoscaled and
+        not shared with another axes.
+    :param max_room: the largest fraction of the axes height that `make_room` may open.
+    :return: the fraction of the legend's area covered, or None if it was not moved.
+    """
+    ax = leg.axes
+    if ax is None:
+        return None
+    strictness = LEGEND_STRICTNESS if strictness is None else strictness
+    if not 0 <= strictness <= 1:
+        raise ValueError(f"The legend strictness must be between 0 and 1, but got {strictness}.")
+    if make_room not in (True, False, "auto"):
+        raise ValueError(
+            f"The make_room option can be True, False or 'auto', but got {make_room!r}.")
+    if not 0 <= max_room < 1:
+        raise ValueError(f"The max_room fraction must be between 0 and 1, but got {max_room}.")
+    leg.set_bbox_to_anchor(None)
+    leg.set_loc("best")
+    leg._hvb_placed = False
+    if strictness == 0:
+        return None
+    if clearance is None:
+        clearance = LEGEND_CLEARANCE * strictness
+    if make_room == "auto":
+        make_room = ax.get_autoscaley_on() and len(ax.get_shared_y_axes().get_siblings(ax)) == 1
+    fig = ax.figure
+    if not _settled:
+        _settle_layout(fig)
+
+    box, frame = _legend_geometry(leg, ax)
+    # Work on a low-resolution render. Positions come out as axes fractions, so they hold.
+    dpi = fig.dpi
+    fig._set_dpi(min(dpi, dpi * _INK_MAP_WIDTH / max(ax.bbox.width, 1.0)), forward=False)
+    try:
+        ink = _ink_map(ax, leg)
+        H, W = ink.shape
+        size = leg._fontsize * fig.dpi / 72.0
+        pad, margin = leg.borderaxespad * size, clearance * size
+        # box and frame in low-resolution pixels from the axes corner
+        bx0, by0, bx1, by1 = box * [W, H, W, H]
+        fx0, fy0, fx1, fy1 = frame * [W, H, W, H]
+        dx, dy = fx0 - bx0, fy0 - by0
+        bw, bh = int(round(fx1 - fx0 + 2 * margin)), int(round(fy1 - fy0 + 2 * margin))
+        # Box positions are indexed by the lower left of frame plus clearance, offset by p.
+        p = int(np.ceil(margin + abs(dx) + abs(dy))) + 1
+        lo_x, lo_y = int(np.ceil(pad + dx - margin)) + p, int(np.ceil(pad + dy - margin)) + p
+        hi_x = int(np.floor(W - pad - (bx1 - bx0) + dx - margin)) + p
+        hi_y = int(np.floor(H - pad - (by1 - by0) + dy - margin)) + p
+        if hi_x < lo_x or hi_y < lo_y:
+            return None
+        # matplotlib's spot, clipped into the range in case rounding put it just outside
+        mx = int(np.clip(round(bx0 + dx - margin) + p, lo_x, hi_x))
+        my = int(np.clip(round(by0 + dy - margin) + p, lo_y, hi_y))
+        ys, xs = np.mgrid[lo_y:hi_y + 1, lo_x:hi_x + 1]
+        distance = np.hypot(xs - mx, ys - my)
+        sat = np.zeros((H + 2 * p + 1, W + 2 * p + 1))
+
+        def covered_map(ink_map, w, h, inset):
+            sat[p + 1:p + 1 + H, p + 1:p + 1 + W] = ink_map.cumsum(0).cumsum(1)
+            sat[p + 1 + H:, p + 1:p + 1 + W] = sat[p + H, p + 1:p + 1 + W]
+            sat[:, p + 1 + W:] = sat[:, p + W:p + 1 + W]
+            y0, x0 = slice(lo_y + inset, hi_y + 1 + inset), slice(lo_x + inset, hi_x + 1 + inset)
+            y1 = slice(lo_y + inset + h, hi_y + 1 + inset + h)
+            x1 = slice(lo_x + inset + w, hi_x + 1 + inset + w)
+            return (sat[y1, x1] - sat[y0, x1] - sat[y1, x0] + sat[y0, x0]) / (w * h)
+
+        # The overlap allowed, a share of what the frame alone has at matplotlib's spot.
+        inner = int(round(margin))
+        at_best = covered_map(ink, bw - 2 * inner, bh - 2 * inner, inner)
+        budget = (1.0 - strictness) * float(at_best[my - lo_y, mx - lo_x]) + 1e-3  # antialiasing
+
+        def choose(ink_map):
+            covered = covered_map(ink_map, bw, bh, 0)
+            fits = covered <= budget
+            score = np.where(fits, distance, np.inf) if fits.any() else covered
+            return np.unravel_index(np.argmin(score), score.shape), covered, fits.any()
+
+        (iy, ix), covered, fits = choose(ink)
+        if not fits and make_room:
+            # The least squeeze of the data toward the bottom that leaves a spot clear enough.
+            low, high = 1.0 - max_room, 1.0
+            if choose(_squeeze_rows(ink, low))[2]:
+                for _step in range(_ROOM_STEPS):
+                    mid = 0.5 * (low + high)
+                    low, high = (mid, high) if choose(_squeeze_rows(ink, mid))[2] else (low, mid)
+            transform = ax.yaxis.get_transform()
+            t0, t1 = transform.transform(np.asarray(ax.get_ylim(), dtype=float))
+            ax.set_ylim(*transform.inverted().transform(np.array([t0, t0 + (t1 - t0) / low])))
+            (iy, ix), covered, fits = choose(_ink_map(ax, leg))
+        loc = ((xs[iy, ix] - p + margin - dx) / W, (ys[iy, ix] - p + margin - dy) / H)
+        if (iy, ix) == (my - lo_y, mx - lo_x):
+            loc = (box[0], box[1])  # exactly matplotlib's spot, free of rounding
+    finally:
+        fig._set_dpi(dpi, forward=False)
+    leg.set_loc(loc)
+    leg._hvb_placed = True
+    return float(covered[iy, ix])
 
 
 # ----------------------------
@@ -1516,6 +1728,7 @@ def finish_hvb(
     frame_kwargs=None,
     style_legend=True,
     legend_kwargs=None,
+    legend_strictness=None,
     style_bars=True,
     bar_kwargs=None,
     style_errorbars=True,
@@ -1525,6 +1738,7 @@ def finish_hvb(
     corner_tick_clearance_pt=None,
     corner_tick_prefer="x",
     corner_tick_include_minor=True,
+    _place_legend=True,
 ):
     if ax.name != "rectilinear":
         return ax
@@ -1582,6 +1796,9 @@ def finish_hvb(
             lk.setdefault("inset", fk.get("inset", 0.008))
         style_hvb_legend(ax.get_legend(), **lk)
 
+    if _place_legend:
+        _place_axes_legends([ax], legend_strictness)
+
     if squircle_frame and not has_raster_or_image:
         _install_hvb_draw_handler(
             ax,
@@ -1624,7 +1841,7 @@ def finish_hvb_figure(fig, **kwargs):
     for ax in _iter_axes(fig):
         if getattr(ax, "_hvb_skip_auto_finish", False):
             continue
-        finish_hvb(ax, **kwargs)
+        finish_hvb(ax, _place_legend=False, **kwargs)
         if ax.name == "rectilinear":
             finished.append(ax)
     if kwargs.get("style_legend", True):
@@ -1636,6 +1853,7 @@ def finish_hvb_figure(fig, **kwargs):
             lk.setdefault("inset", fk.get("inset", 0.008))
         for leg in fig.legends:
             style_hvb_legend(leg, **lk)
+    _place_axes_legends(finished, kwargs.get("legend_strictness"))
     return fig
 
 
@@ -1911,7 +2129,7 @@ def dark_rc(background="#141414", foreground="white", grid="#333333",
 
 def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
         font=None, math=None, grid=False, exponent=120.0, flat_face_ticks=True,
-        auto=True):
+        legend_strictness=None, auto=True):
     """Apply the style globally. Figures are finished automatically on save.
 
     `dark` may be True or a background color. `scale` shrinks frame, tick and
@@ -1944,6 +2162,7 @@ def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
     if auto:
         activate_hvb(palette=None, finish_kwargs={
             "flat_face_ticks": flat_face_ticks,
+            "legend_strictness": legend_strictness,
             "frame_kwargs": {"exponent": exponent},
             "legend_kwargs": {"exponent": exponent},
         })
