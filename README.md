@@ -178,7 +178,7 @@ such as ≈ and ∞ in hvb Serif, are drawn from the next font in the family lis
 | `dark` | data lines on a dark (`#141414`) background |
 | `dark2`, `viridis` | samples of the matplotlib colormaps of the same name |
 
-| # | hue | `default` | `muted` | `fill` | `dark` |
+| # | hue | `default` | `muted` | `fill` | `dark-background` |
 |---|---|---|---|---|---|
 | 0 | blue | <img src="docs/swatches/357CDA.svg" alt="#357CDA"> `#357CDA` | <img src="docs/swatches/95C2FF.svg" alt="#95C2FF"> `#95C2FF` | <img src="docs/swatches/BBD8FF.svg" alt="#BBD8FF"> `#BBD8FF` | <img src="docs/swatches/9CC9FF.svg" alt="#9CC9FF"> `#9CC9FF` |
 | 1 | red | <img src="docs/swatches/D90000.svg" alt="#D90000"> `#D90000` | <img src="docs/swatches/FFA091.svg" alt="#FFA091"> `#FFA091` | <img src="docs/swatches/FFC3B9.svg" alt="#FFC3B9"> `#FFC3B9` | <img src="docs/swatches/FF5416.svg" alt="#FF5416"> `#FF5416` |
