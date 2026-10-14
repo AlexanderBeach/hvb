@@ -1947,6 +1947,8 @@ def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
             "frame_kwargs": {"exponent": exponent},
             "legend_kwargs": {"exponent": exponent},
         })
+    elif _HVB_RUNTIME["active"]:
+        deactivate_hvb()
     return mpl.rcParams
 
 
