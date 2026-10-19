@@ -134,7 +134,7 @@ HVB_PALETTES = {
         (0.882353, 0.752941, 0.698039),  # brown  #E1C0B2
     ],
     # Data lines on a dark background (#141414).
-    "dark": [
+    "dark-background": [
         (0.611765, 0.788235, 1.000000),  # blue   #9CC9FF
         (1.000000, 0.329412, 0.086275),  # red    #FF5416
         (0.298039, 0.831373, 0.521569),  # green  #4CD485
@@ -2138,7 +2138,7 @@ def scale_rc(scale=1.0, text=False, tick_size=(6.7, 4.5)):
 
 
 def dark_rc(background="#141414", foreground="white", grid="#333333",
-            legend_face="#1E1E1E", legend_edge="#3A3A3A", palette="dark"):
+            legend_face="#1E1E1E", legend_edge="#3A3A3A", palette="dark-background"):
     """rcParams for a dark background. Layer over the base style."""
     rc = {
         "figure.facecolor": background,
@@ -2180,7 +2180,7 @@ def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
         mpl.rcParams["lines.linewidth"] = linewidth
     if dark:
         bg = "#141414" if dark is True else dark
-        mpl.rcParams.update(dark_rc(background=bg, palette=palette or "dark"))
+        mpl.rcParams.update(dark_rc(background=bg, palette=palette or "dark-background"))
     elif palette:
         set_hvb_palette(palette)
     if font:
