@@ -208,7 +208,7 @@ such as ≈ and ∞ in hvb Serif, are drawn from the next font in the family lis
 | `default` | data lines on a white background |
 | `muted` | context series that sit behind the primary lines |
 | `fill` | fills and confidence bands, used opaque rather than with transparency |
-| `dark` | data lines on a dark (`#141414`) background |
+| `dark-background` | data lines on a dark (`#141414`) background |
 | `dark2`, `viridis` | samples of the matplotlib colormaps of the same name |
 
 | # | hue | `default` | `muted` | `fill` | `dark-background` |
