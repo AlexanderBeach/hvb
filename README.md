@@ -66,9 +66,10 @@ A legend left at matplotlib's default `loc="best"` is moved off the plot when th
 saved or shown. matplotlib's `"best"` tries only nine fixed spots and counts data points rather
 than the area they cover, so its choice can still sit on a fill, a dense line or a label. hvb
 starts from that spot and moves the legend to the nearest spot inside the frame that is covered
-less, counting every artist drawn in the axes, including lines, fills, scatter points, text,
-annotations and inset axes. If no spot is clear enough, the top of the y-range is raised just
-enough to make one, by at most 60% of the axes height. A y-range set with `ax.set_ylim` or
+less, counting everything in the axes but the background and the gridlines, including lines,
+fills, scatter points, text, annotations, inset axes, the frame, the ticks, the tick and axis
+labels, and the artists of any axes laid over it, such as a twin. If no spot is clear enough,
+the top of the y-range is raised just enough to make one, by at most 60% of the axes height. A y-range set with `ax.set_ylim` or
 shared with another axes is never changed, and a legend given an explicit `loc`, or added to
 the figure rather than an axes, is left where it was put.
 
@@ -96,12 +97,14 @@ The arguments to `hvb.use()` are:
   whatever the size of the legend.
 - `flat_face_ticks`: `True` by default, which hides any tick that would land on a rounded
   corner of the frame rather than on a straight edge.
-- `legend_strictness`: how far legends are moved off the plot, from 0 to 1. A legend may be
+- `legend_strictness`: how far legends are moved off the plot, 0 or more. A legend may be
   covered by `1 - legend_strictness` times as much of the plot as at matplotlib's spot, so 0
   keeps matplotlib's `loc="best"`, 0.5 halves the overlap it has there, and 1, the default,
   lets nothing touch the legend or the small clearance kept around it. The clearance grows with
   the strictness, and values in between move the legend, or raise the y-range, by amounts in
-  between.
+  between. Above 1 nothing may touch the legend either, and the clearance keeps growing, so 2
+  keeps twice the clearance of 1. If no spot is that clear, the legend goes to the least covered
+  one.
 - `auto`: `False` sets the rcParams only, without the squircle frame, the legend styling, the
   rounded bars and error bars, or the longer mid-decade ticks, and switches these off if an
   earlier `hvb.use()` turned them on.
