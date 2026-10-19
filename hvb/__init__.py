@@ -672,10 +672,11 @@ def style_hvb_legend(
 # ----------------------------
 # 3b) Legend placement
 # ----------------------------
-# How strictly finish_hvb keeps legends off the data, from 0 to 1. See place_legend.
+# How strictly finish_hvb keeps legends off the plot, 0 or more. See place_legend.
 LEGEND_STRICTNESS = 1.0
 
 # Space kept clear around a legend frame at strictness 1, in units of the legend font size.
+# It scales with the strictness, so values above 1 keep proportionally more.
 LEGEND_CLEARANCE = 0.4
 
 # Width in pixels the axes are rendered at to find the ink a legend would cover.
@@ -685,16 +686,43 @@ _INK_MAP_WIDTH = 480
 _ROOM_STEPS = 10
 
 
+def _overlaid_axes(ax):
+    """`ax` and the axes drawn over the same area, such as the twin made by twinx."""
+    bounds = ax.get_position().bounds
+    return [ax] + [other for other in ax.figure.axes
+                   if other is not ax and np.allclose(other.get_position().bounds, bounds)]
+
+
 def _legend_obstacles(ax, leg):
-    """Artists in `ax` a legend should not cover: all but the axes, frame and titles."""
-    skip = {id(leg), id(ax.patch), id(getattr(ax, "_hvb_frame_fill", None)),
-            id(getattr(ax, "_hvb_frame_border", None)),
-            id(ax.title), id(ax._left_title), id(ax._right_title)}
-    skip |= {id(child) for child in ax.child_axes}
-    artists = [a for a in ax.get_children()
-               if id(a) not in skip and a.get_visible()
-               and not isinstance(a, (maxis.Axis, mspines.Spine))]
+    """Artists a legend in `ax` should not cover: all but `leg` and the axes backgrounds.
+
+    Spines, the frame border, ticks, tick labels and axis labels count, as do the artists of
+    any axes overlaid on `ax`. Gridlines are left to `_draw_axis_without_grid`.
+    """
+    skip = {id(leg)}
+    artists = []
+    for member in _overlaid_axes(ax):
+        skip |= {id(member.patch), id(getattr(member, "_hvb_frame_fill", None))}
+        skip |= {id(child) for child in member.child_axes}
+        furniture = (maxis.Axis, mspines.Spine)
+        artists += [a for a in member.get_children()
+                    if id(a) not in skip and a.get_visible()
+                    and (member.axison or not isinstance(a, furniture))]
     return sorted(artists, key=lambda a: a.get_zorder())
+
+
+def _draw_axis_without_grid(axis, renderer):
+    """Draw the ticks, tick labels and label of `axis` but not its gridlines, which are whitespace."""
+    axis._update_ticks()  # creates the ticks the draw needs, so none is made after the grid is hidden
+    ticks = axis.majorTicks + axis.minorTicks
+    shown = [tick.gridline.get_visible() for tick in ticks]
+    for tick in ticks:
+        tick.gridline.set_visible(False)
+    try:
+        axis.draw(renderer)
+    finally:
+        for tick, visible in zip(ticks, shown):
+            tick.gridline.set_visible(visible)
 
 
 def _figure_renderer(fig):
@@ -703,14 +731,18 @@ def _figure_renderer(fig):
 
 
 def _ink_map(ax, leg):
-    """Opacity (0 to 1) of everything drawn in `ax` but `leg`, rows bottom-up."""
+    """Opacity (0 to 1) of everything in `ax` but `leg` and the gridlines, rows bottom-up."""
     renderer = _figure_renderer(ax.figure)
     for artist in _legend_obstacles(ax, leg):
-        artist.draw(renderer)
+        if isinstance(artist, maxis.Axis):
+            _draw_axis_without_grid(artist, renderer)
+        else:
+            artist.draw(renderer)
     ink = np.asarray(renderer.buffer_rgba())[::-1, :, 3] / 255.0
-    for child in ax.child_axes:  # inset axes count as solid
-        bb = child.get_window_extent()
-        ink[int(bb.y0):int(np.ceil(bb.y1)), int(bb.x0):int(np.ceil(bb.x1))] = 1.0
+    for member in _overlaid_axes(ax):
+        for child in member.child_axes:  # inset axes count as solid
+            bb = child.get_window_extent()
+            ink[int(bb.y0):int(np.ceil(bb.y1)), int(bb.x0):int(np.ceil(bb.x1))] = 1.0
     x0, y0 = int(round(ax.bbox.x0)), int(round(ax.bbox.y0))
     return ink[y0:y0 + int(round(ax.bbox.height)), x0:x0 + int(round(ax.bbox.width))]
 
@@ -731,20 +763,6 @@ def _legend_geometry(leg, ax):
     to_axes = ax.transAxes.inverted()
     return (to_axes.transform([[box.x0, box.y0], [box.x1, box.y1]]).ravel(),
             to_axes.transform([[frame.x0, frame.y0], [frame.x1, frame.y1]]).ravel())
-
-
-def _squeeze_rows(ink, squeeze):
-    """The ink map with its rows pressed toward the bottom by `squeeze`, as a lower y-top would."""
-    H = ink.shape[0]
-    rows = np.arange(int(np.ceil(H * squeeze)))
-    first = np.minimum((rows / squeeze).astype(int), H - 1)
-    last = np.minimum(((rows + 1) / squeeze).astype(int), H) - 1
-    out = np.zeros_like(ink)
-    # each row keeps the darkest of the rows pressed into it, so thin lines do not vanish
-    out[:rows.size] = ink[first]
-    for step in range(1, int(np.ceil(1 / squeeze)) + 1):
-        out[:rows.size] = np.maximum(out[:rows.size], ink[np.minimum(first + step, last)])
-    return out
 
 
 def _settle_layout(fig):
@@ -769,15 +787,17 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
                  _settled=False):
     """Move an axes legend off the plot by `strictness`, starting from matplotlib's "best".
 
-    Every drawn artist in the axes counts as plot, including fills, text, annotations,
-    other legends and inset axes. The legend may be covered by (1 - strictness) times as
+    Everything drawn in the axes counts as plot but the background and the gridlines:
+    lines, fills, text, annotations, other legends, inset axes, the frame, the ticks, the
+    tick labels and the axis labels. The legend may be covered by (1 - strictness) times as
     much as at the spot loc="best" picks, and goes to the nearest spot that meets this.
     If no spot does, the top of the y-range is raised just enough to make one.
 
     :param leg: the legend of an axes.
-    :param strictness: from 0 to 1. 0 leaves the legend to matplotlib's loc="best", 0.5
+    :param strictness: 0 or more. 0 leaves the legend to matplotlib's loc="best", 0.5
         allows half the overlap it has there, and 1 none, nor in the clearance around it.
-        None uses LEGEND_STRICTNESS.
+        Above 1 the overlap stays at none and the clearance keeps growing, so 2 keeps
+        twice the clearance of 1. None uses LEGEND_STRICTNESS.
     :param clearance: the space kept clear around the frame, in units of the legend font
         size. None uses LEGEND_CLEARANCE times the strictness.
     :param make_room: True raises the top of the y-range when no spot is clear enough,
@@ -790,8 +810,8 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
     if ax is None:
         return None
     strictness = LEGEND_STRICTNESS if strictness is None else strictness
-    if not 0 <= strictness <= 1:
-        raise ValueError(f"The legend strictness must be between 0 and 1, but got {strictness}.")
+    if not (np.isfinite(strictness) and strictness >= 0):
+        raise ValueError(f"The legend strictness must be a finite number of at least 0, but got {strictness}.")
     if make_room not in (True, False, "auto"):
         raise ValueError(
             f"The make_room option can be True, False or 'auto', but got {make_room!r}.")
@@ -850,7 +870,7 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
         # The overlap allowed, a share of what the frame alone has at matplotlib's spot.
         inner = int(round(margin))
         at_best = covered_map(ink, bw - 2 * inner, bh - 2 * inner, inner)
-        budget = (1.0 - strictness) * float(at_best[my - lo_y, mx - lo_x]) + 1e-3  # antialiasing
+        budget = max(1.0 - strictness, 0.0) * float(at_best[my - lo_y, mx - lo_x]) + 1e-3  # antialiasing
 
         def choose(ink_map):
             covered = covered_map(ink_map, bw, bh, 0)
@@ -859,16 +879,29 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
             return np.unravel_index(np.argmin(score), score.shape), covered, fits.any()
 
         (iy, ix), covered, fits = choose(ink)
-        if not fits and make_room:
-            # The least squeeze of the data toward the bottom that leaves a spot clear enough.
+        if not fits and make_room and max_room > 0:
+            # The data's share of the axes height that leaves a spot clear enough, the largest
+            # one. The axes are re-rendered at each step since ticks do not squeeze with the data.
+            ylim = ax.get_ylim()
+            transform = ax.yaxis.get_transform()
+            t0, t1 = transform.transform(np.asarray(ylim, dtype=float))
+
+            def raise_top(share, **kwargs):
+                ax.set_ylim(*transform.inverted().transform(np.array([t0, t0 + (t1 - t0) / share])),
+                            **kwargs)
+
+            def clear_at(share):
+                raise_top(share, auto=None)
+                return choose(_ink_map(ax, leg))[2]
+
             low, high = 1.0 - max_room, 1.0
-            if choose(_squeeze_rows(ink, low))[2]:
+            if clear_at(low):
                 for _step in range(_ROOM_STEPS):
                     mid = 0.5 * (low + high)
-                    low, high = (mid, high) if choose(_squeeze_rows(ink, mid))[2] else (low, mid)
-            transform = ax.yaxis.get_transform()
-            t0, t1 = transform.transform(np.asarray(ax.get_ylim(), dtype=float))
-            ax.set_ylim(*transform.inverted().transform(np.array([t0, t0 + (t1 - t0) / low])))
+                    low, high = (mid, high) if clear_at(mid) else (low, mid)
+                raise_top(low)
+            else:
+                ax.set_ylim(ylim, auto=None)  # no raise helps, so the y-range stays
             (iy, ix), covered, fits = choose(_ink_map(ax, leg))
         loc = ((xs[iy, ix] - p + margin - dx) / W, (ys[iy, ix] - p + margin - dy) / H)
         if (iy, ix) == (my - lo_y, mx - lo_x):
