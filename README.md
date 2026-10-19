@@ -79,8 +79,8 @@ The arguments to `hvb.use()` are:
   the default size. Font sizes are left unchanged unless `text` is also set.
 - `text`: `True` scales the font sizes by `scale` as well. A number scales the font sizes by
   that factor instead.
-- `dark`: `True` switches to a `#141414` background with white text and frame, and the `dark`
-  palette. A color string sets a different background color.
+- `dark`: `True` switches to a `#141414` background with white text and frame, and the
+  `dark-background` palette. A color string sets a different background color.
 - `palette`: the name of the palette used for the color cycle (see below).
 - `font`: the text font. One of the bundled names `"serif"` (hvb Serif, the default),
   `"xcharter"`, `"sans"` (FiraGO Book), `"atkinson"` (Atkinson Hyperlegible Next) or `"mono"`
