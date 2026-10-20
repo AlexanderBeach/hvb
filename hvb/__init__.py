@@ -682,7 +682,10 @@ LEGEND_CLEARANCE = 0.4
 # Width in pixels the axes are rendered at to find the ink a legend would cover.
 _INK_MAP_WIDTH = 480
 
-# Bisection steps when finding how far to raise the y-range, enough for 0.1% of the height.
+# Largest share of the axes width or height a range may grow by to clear a spot for a legend.
+LEGEND_ROOM = 0.6
+
+# Bisection steps when finding how far to extend a range, enough for 0.1% of the axes size.
 _ROOM_STEPS = 10
 
 # Where finish_hvb may put a legend, a zone name or a list of them. See place_legend.
@@ -824,17 +827,17 @@ def _settle_layout(fig):
         fig.draw_without_rendering()
 
 
-def _place_axes_legends(axes, strictness, zones=None):
+def _place_axes_legends(axes, strictness, zones=None, room=None):
     """Place the legends of `axes` left at loc="best", or placed by hvb before."""
     legends = [leg for leg in (ax.get_legend() for ax in axes)
                if leg is not None and (leg._loc == 0 or getattr(leg, "_hvb_placed", False))]
     if legends:
         _settle_layout(legends[0].figure)
     for leg in legends:
-        place_legend(leg, strictness=strictness, zones=zones, _settled=True)
+        place_legend(leg, strictness=strictness, max_room=room, zones=zones, _settled=True)
 
 
-def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_room=0.6,
+def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_room=None,
                  zones=None, _settled=False):
     """Move an axes legend off the plot by `strictness`, starting from matplotlib's "best".
 
@@ -842,8 +845,9 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
     lines, fills, text, annotations, other legends, inset axes, the frame, the ticks, the
     tick labels and the axis labels. The legend may be covered by (1 - strictness) times as
     much as at the spot loc="best" picks, and goes to the nearest spot that meets this.
-    If no spot does, the top of the y-range is raised just enough to make one. With `zones`,
-    only spots whose legend center is in those parts of the axes are considered.
+    If no spot does, one end of the x- or y-range is extended just enough to make one, the
+    end that needs the least room, trying the top, bottom, right and left in that order.
+    With `zones`, only spots whose legend center is in those parts of the axes are considered.
 
     :param leg: the legend of an axes.
     :param strictness: 0 or more. 0 leaves the legend to matplotlib's loc="best", 0.5
@@ -852,10 +856,11 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
         twice the clearance of 1. None uses LEGEND_STRICTNESS.
     :param clearance: the space kept clear around the frame, in units of the legend font
         size. None uses LEGEND_CLEARANCE times the strictness.
-    :param make_room: True raises the top of the y-range when no spot is clear enough,
-        squeezing the data down. "auto" does this only when the y-range is autoscaled and
-        not shared with another axes.
-    :param max_room: the largest fraction of the axes height that `make_room` may open.
+    :param make_room: True extends the x- or y-range when no spot is clear enough, squeezing
+        the data away from the new space. "auto" extends only a range that is autoscaled and
+        not shared with another axes. False keeps both ranges.
+    :param max_room: the largest fraction of the axes width or height that `make_room` may
+        open. None uses LEGEND_ROOM.
     :param zones: where the legend may go, one name or a list of them from 'top-left',
         'top-right', 'bottom-left', 'bottom-right', 'top', 'bottom', 'left', 'right',
         'center', 'corners' (the four corners), 'sides' (top, bottom, left and right) and
@@ -874,8 +879,9 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
     if make_room not in (True, False, "auto"):
         raise ValueError(
             f"The make_room option can be True, False or 'auto', but got {make_room!r}.")
+    max_room = LEGEND_ROOM if max_room is None else max_room
     if not 0 <= max_room < 1:
-        raise ValueError(f"The max_room fraction must be between 0 and 1, but got {max_room}.")
+        raise ValueError(f"The legend room must be at least 0 and less than 1, but got {max_room}.")
     cells = _legend_zone_cells(zones)
     leg.set_bbox_to_anchor(None)
     leg.set_loc("best")
@@ -885,7 +891,12 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
     if clearance is None:
         clearance = LEGEND_CLEARANCE * strictness
     if make_room == "auto":
-        make_room = ax.get_autoscaley_on() and len(ax.get_shared_y_axes().get_siblings(ax)) == 1
+        growable = [name for name, autoscaled, shared in (
+            ("y", ax.get_autoscaley_on(), ax.get_shared_y_axes()),
+            ("x", ax.get_autoscalex_on(), ax.get_shared_x_axes()))
+            if autoscaled and len(shared.get_siblings(ax)) == 1]
+    else:
+        growable = ["y", "x"] if make_room else []
     fig = ax.figure
     if not _settled:
         _settle_layout(fig)
@@ -943,29 +954,38 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
             return np.unravel_index(np.argmin(score), score.shape), covered, fits.any()
 
         (iy, ix), covered, fits = choose(ink)
-        if not fits and make_room and max_room > 0:
-            # The data's share of the axes height that leaves a spot clear enough, the largest
-            # one. The axes are re-rendered at each step since ticks do not squeeze with the data.
-            ylim = ax.get_ylim()
-            transform = ax.yaxis.get_transform()
-            t0, t1 = transform.transform(np.asarray(ylim, dtype=float))
+        if not fits and growable and max_room > 0:
+            # The data's share of the axes width or height that leaves a spot clear enough, the
+            # largest over the ends. The axes are re-rendered at each step since ticks and tick
+            # labels do not squeeze with the data.
+            limits = {name: getattr(ax, f"get_{name}lim")() for name in growable}
 
-            def raise_top(share, **kwargs):
-                ax.set_ylim(*transform.inverted().transform(np.array([t0, t0 + (t1 - t0) / share])),
-                            **kwargs)
+            def extend(name, far, share, **kwargs):
+                """Give the data `share` of the `name` range, opening the top or right if `far`."""
+                transform = getattr(ax, f"{name}axis").get_transform()
+                t0, t1 = transform.transform(np.asarray(limits[name], dtype=float))
+                span = (t1 - t0) / share
+                # The second limit is drawn at the top or right unless the axis is inverted.
+                ends = [t0, t0 + span] if far == (t1 > t0) else [t1 - span, t1]
+                getattr(ax, f"set_{name}lim")(*transform.inverted().transform(np.array(ends)), **kwargs)
 
-            def clear_at(share):
-                raise_top(share, auto=None)
+            def clear_at(name, far, share):
+                extend(name, far, share, auto=None)
                 return choose(_ink_map(ax, leg))[2]
 
-            low, high = 1.0 - max_room, 1.0
-            if clear_at(low):
-                for _step in range(_ROOM_STEPS):
-                    mid = 0.5 * (low + high)
-                    low, high = (mid, high) if clear_at(mid) else (low, mid)
-                raise_top(low)
-            else:
-                ax.set_ylim(ylim, auto=None)  # no raise helps, so the y-range stays
+            # An end is bisected only when it is clear at the best share found so far.
+            best, low = None, 1.0 - max_room
+            for name in growable:
+                for far in (True, False):
+                    if clear_at(name, far, low):
+                        high = 1.0
+                        for _step in range(_ROOM_STEPS):
+                            mid = 0.5 * (low + high)
+                            low, high = (mid, high) if clear_at(name, far, mid) else (low, mid)
+                        best = (name, far)
+                    getattr(ax, f"set_{name}lim")(limits[name], auto=None)
+            if best is not None:
+                extend(*best, low)
             (iy, ix), covered, fits = choose(_ink_map(ax, leg))
         loc = ((xs[iy, ix] - p + margin - dx) / W, (ys[iy, ix] - p + margin - dy) / H)
         if (iy, ix) == (my - lo_y, mx - lo_x):
@@ -1827,6 +1847,7 @@ def finish_hvb(
     legend_kwargs=None,
     legend_strictness=None,
     legend_zones=None,
+    legend_room=None,
     style_bars=True,
     bar_kwargs=None,
     style_errorbars=True,
@@ -1895,7 +1916,7 @@ def finish_hvb(
         style_hvb_legend(ax.get_legend(), **lk)
 
     if _place_legend:
-        _place_axes_legends([ax], legend_strictness, legend_zones)
+        _place_axes_legends([ax], legend_strictness, legend_zones, legend_room)
 
     if squircle_frame and not has_raster_or_image:
         _install_hvb_draw_handler(
@@ -1951,7 +1972,8 @@ def finish_hvb_figure(fig, **kwargs):
             lk.setdefault("inset", fk.get("inset", 0.008))
         for leg in fig.legends:
             style_hvb_legend(leg, **lk)
-    _place_axes_legends(finished, kwargs.get("legend_strictness"), kwargs.get("legend_zones"))
+    _place_axes_legends(finished, kwargs.get("legend_strictness"), kwargs.get("legend_zones"),
+                        kwargs.get("legend_room"))
     return fig
 
 
@@ -2227,7 +2249,7 @@ def dark_rc(background="#141414", foreground="white", grid="#333333",
 
 def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
         font=None, math=None, grid=False, exponent=120.0, flat_face_ticks=True,
-        legend_strictness=None, legend_zones=None, auto=True):
+        legend_strictness=None, legend_zones=None, legend_room=None, auto=True):
     """Apply the style globally. Figures are finished automatically on save.
 
     `dark` may be True or a background color. `scale` shrinks frame, tick and
@@ -2235,7 +2257,8 @@ def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
     bundled names in TEXT_FONTS, a font name, or a path to a font file, and
     replaces the text font but not the math font. `math` is one of the bundled
     setups in MATH_FONTS, or a font family, and replaces the math font.
-    `legend_zones` limits where legends may go, as described in place_legend.
+    `legend_zones` limits where legends may go, and `legend_room` how far a range may
+    grow to clear a spot for one, as described in place_legend.
     """
     plt.style.use(["default", get_style_path()])
     mpl.rcParams["axes.grid"] = bool(grid)
@@ -2263,6 +2286,7 @@ def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
             "flat_face_ticks": flat_face_ticks,
             "legend_strictness": legend_strictness,
             "legend_zones": legend_zones,
+            "legend_room": legend_room,
             "frame_kwargs": {"exponent": exponent},
             "legend_kwargs": {"exponent": exponent},
         })
