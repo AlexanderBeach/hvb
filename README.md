@@ -69,9 +69,11 @@ starts from that spot and moves the legend to the nearest spot inside the frame 
 less, counting everything in the axes but the background and the gridlines, including lines,
 fills, scatter points, text, annotations, inset axes, the frame, the ticks, the tick and axis
 labels, and the artists of any axes laid over it, such as a twin. If no spot is clear enough,
-the top of the y-range is raised just enough to make one, by at most 60% of the axes height. A y-range set with `ax.set_ylim` or
-shared with another axes is never changed, and a legend given an explicit `loc`, or added to
-the figure rather than an axes, is left where it was put.
+one end of the x- or y-range is extended just enough to make one, by at most 60% of the axes
+width or height. Of the top, bottom, right and left, the end that needs the least room is
+extended, the earlier in that order on a tie. A range set with `ax.set_xlim` or `ax.set_ylim`,
+or shared with another axes, is never changed, and a legend given an explicit `loc`, or added
+to the figure rather than an axes, is left where it was put.
 
 The arguments to `hvb.use()` are:
 
@@ -101,7 +103,7 @@ The arguments to `hvb.use()` are:
   covered by `1 - legend_strictness` times as much of the plot as at matplotlib's spot, so 0
   keeps matplotlib's `loc="best"`, 0.5 halves the overlap it has there, and 1, the default,
   lets nothing touch the legend or the small clearance kept around it. The clearance grows with
-  the strictness, and values in between move the legend, or raise the y-range, by amounts in
+  the strictness, and values in between move the legend, or extend a range, by amounts in
   between. Above 1 nothing may touch the legend either, and the clearance keeps growing, so 2
   keeps twice the clearance of 1. If no spot is that clear, the legend goes to the least covered
   one.
@@ -112,10 +114,12 @@ The arguments to `hvb.use()` are:
   bottom, left and right together) and `"anywhere"`. An edge name is the whole edge, corners
   included, so `"top"` is the top row. A list allows any of its zones, so
   `["corners", "bottom"]` allows the four corners and the bottom row. The legend goes to the
-  nearest allowed spot that is clear enough, or the least covered allowed spot, and the y-range
-  is raised only if that opens a clear spot in the zones. A legend too large for any spot in the
+  nearest allowed spot that is clear enough, or the least covered allowed spot, and a range is
+  extended only if that opens a clear spot in the zones. A legend too large for any spot in the
   zones goes to the closest one. With a zone set, `legend_strictness=0` still moves the legend
   into the zone, to a spot covered no more than matplotlib's.
+- `legend_room`: the largest share of the axes width or height a range may be extended by to
+  clear a spot for a legend, 0.6 by default. 0 keeps every range as matplotlib sets it.
 - `auto`: `False` sets the rcParams only, without the squircle frame, the legend styling, the
   rounded bars and error bars, or the longer mid-decade ticks, and switches these off if an
   earlier `hvb.use()` turned them on.
@@ -254,5 +258,6 @@ axes and figure legends. `scale_rc()` and `dark_rc()` return the dictionaries of
 `size_mid_decade_ticks(ax.xaxis, fraction)` sets the minor tick lengths of one axis; after
 `hvb.use()` it runs whenever an axis is drawn, with `hvb.MID_DECADE_TICK` as the fraction.
 `place_legend(leg, strictness, zones=...)` places one axes legend as described above and returns
-the fraction of its area left covered. `finish_hvb` takes the same `legend_strictness` and
-`legend_zones`, and `hvb.LEGEND_STRICTNESS` and `hvb.LEGEND_ZONES` set the defaults for both.
+the fraction of its area left covered. `finish_hvb` takes the same `legend_strictness`,
+`legend_zones` and `legend_room`, and `hvb.LEGEND_STRICTNESS`, `hvb.LEGEND_ZONES` and
+`hvb.LEGEND_ROOM` set the defaults for all three.
