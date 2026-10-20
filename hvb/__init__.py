@@ -685,6 +685,57 @@ _INK_MAP_WIDTH = 480
 # Bisection steps when finding how far to raise the y-range, enough for 0.1% of the height.
 _ROOM_STEPS = 10
 
+# Where finish_hvb may put a legend, a zone name or a list of them. See place_legend.
+LEGEND_ZONES = "anywhere"
+
+# The 3 by 3 grid laid over the axes, as (column, row) with column 0 at the left and row 0 at
+# the bottom. A zone is a set of its cells, and a legend is in the cell its center is in.
+_GRID_CELLS = frozenset((column, row) for column in range(3) for row in range(3))
+_LEGEND_ZONE_CELLS = {
+    "top-left": frozenset({(0, 2)}),
+    "top-right": frozenset({(2, 2)}),
+    "bottom-left": frozenset({(0, 0)}),
+    "bottom-right": frozenset({(2, 0)}),
+    "top": frozenset((column, 2) for column in range(3)),
+    "bottom": frozenset((column, 0) for column in range(3)),
+    "left": frozenset((0, row) for row in range(3)),
+    "right": frozenset((2, row) for row in range(3)),
+    "center": frozenset({(1, 1)}),
+}
+_LEGEND_ZONE_CELLS["corners"] = (_LEGEND_ZONE_CELLS["top-left"] | _LEGEND_ZONE_CELLS["top-right"]
+                                 | _LEGEND_ZONE_CELLS["bottom-left"]
+                                 | _LEGEND_ZONE_CELLS["bottom-right"])
+_LEGEND_ZONE_CELLS["sides"] = (_LEGEND_ZONE_CELLS["top"] | _LEGEND_ZONE_CELLS["bottom"]
+                               | _LEGEND_ZONE_CELLS["left"] | _LEGEND_ZONE_CELLS["right"])
+_LEGEND_ZONE_CELLS["anywhere"] = _GRID_CELLS
+
+
+def _legend_zone_cells(zones):
+    """The grid cells covered by `zones`, a zone name or a list of them, None for LEGEND_ZONES."""
+    zones = LEGEND_ZONES if zones is None else zones
+    names = [zones] if isinstance(zones, str) or not hasattr(zones, "__iter__") else list(zones)
+    cells = set()
+    for name in names:
+        key = name.strip().lower().replace("_", "-").replace(" ", "-") if isinstance(name, str) else None
+        if key not in _LEGEND_ZONE_CELLS:
+            quoted = [f"'{zone}'" for zone in _LEGEND_ZONE_CELLS]
+            raise ValueError(f"The legend zone can be {', '.join(quoted[:-1])} or {quoted[-1]}, "
+                             f"but got {name!r}.")
+        cells |= _LEGEND_ZONE_CELLS[key]
+    if not cells:
+        raise ValueError("The legend zones must include at least one zone, but got an empty list.")
+    return cells
+
+
+def _zone_gap(center_x, center_y, cells):
+    """Distance, in axes fractions, from each center to the nearest of the grid `cells`."""
+    gap = np.full(np.shape(center_x), np.inf)
+    for column, row in cells:
+        dx = np.maximum(np.maximum(column / 3 - center_x, center_x - (column + 1) / 3), 0.0)
+        dy = np.maximum(np.maximum(row / 3 - center_y, center_y - (row + 1) / 3), 0.0)
+        gap = np.minimum(gap, np.hypot(dx, dy))
+    return gap
+
 
 def _overlaid_axes(ax):
     """`ax` and the axes drawn over the same area, such as the twin made by twinx."""
@@ -773,25 +824,26 @@ def _settle_layout(fig):
         fig.draw_without_rendering()
 
 
-def _place_axes_legends(axes, strictness):
+def _place_axes_legends(axes, strictness, zones=None):
     """Place the legends of `axes` left at loc="best", or placed by hvb before."""
     legends = [leg for leg in (ax.get_legend() for ax in axes)
                if leg is not None and (leg._loc == 0 or getattr(leg, "_hvb_placed", False))]
     if legends:
         _settle_layout(legends[0].figure)
     for leg in legends:
-        place_legend(leg, strictness=strictness, _settled=True)
+        place_legend(leg, strictness=strictness, zones=zones, _settled=True)
 
 
 def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_room=0.6,
-                 _settled=False):
+                 zones=None, _settled=False):
     """Move an axes legend off the plot by `strictness`, starting from matplotlib's "best".
 
     Everything drawn in the axes counts as plot but the background and the gridlines:
     lines, fills, text, annotations, other legends, inset axes, the frame, the ticks, the
     tick labels and the axis labels. The legend may be covered by (1 - strictness) times as
     much as at the spot loc="best" picks, and goes to the nearest spot that meets this.
-    If no spot does, the top of the y-range is raised just enough to make one.
+    If no spot does, the top of the y-range is raised just enough to make one. With `zones`,
+    only spots whose legend center is in those parts of the axes are considered.
 
     :param leg: the legend of an axes.
     :param strictness: 0 or more. 0 leaves the legend to matplotlib's loc="best", 0.5
@@ -804,6 +856,13 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
         squeezing the data down. "auto" does this only when the y-range is autoscaled and
         not shared with another axes.
     :param max_room: the largest fraction of the axes height that `make_room` may open.
+    :param zones: where the legend may go, one name or a list of them from 'top-left',
+        'top-right', 'bottom-left', 'bottom-right', 'top', 'bottom', 'left', 'right',
+        'center', 'corners' (the four corners), 'sides' (top, bottom, left and right) and
+        'anywhere'. The axes are split into a 3 by 3 grid, a legend is in the cell its center
+        is in, and 'top' is the whole top row, corners included. If the legend is too large
+        for any spot in the zones, it goes to the closest one. Strictness 0 still leaves
+        loc="best" alone unless zones are set. None uses LEGEND_ZONES.
     :return: the fraction of the legend's area covered, or None if it was not moved.
     """
     ax = leg.axes
@@ -817,10 +876,11 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
             f"The make_room option can be True, False or 'auto', but got {make_room!r}.")
     if not 0 <= max_room < 1:
         raise ValueError(f"The max_room fraction must be between 0 and 1, but got {max_room}.")
+    cells = _legend_zone_cells(zones)
     leg.set_bbox_to_anchor(None)
     leg.set_loc("best")
     leg._hvb_placed = False
-    if strictness == 0:
+    if strictness == 0 and cells == _GRID_CELLS:
         return None
     if clearance is None:
         clearance = LEGEND_CLEARANCE * strictness
@@ -856,7 +916,11 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
         my = int(np.clip(round(by0 + dy - margin) + p, lo_y, hi_y))
         ys, xs = np.mgrid[lo_y:hi_y + 1, lo_x:hi_x + 1]
         distance = np.hypot(xs - mx, ys - my)
-        sat = np.zeros((H + 2 * p + 1, W + 2 * p + 1))
+        # Spots whose legend center is in a zone, or in the nearest cells if none is.
+        gap = _zone_gap((xs - p + margin - dx + 0.5 * (bx1 - bx0)) / W,
+                        (ys - p + margin - dy + 0.5 * (by1 - by0)) / H, cells)
+        allowed = gap <= gap.min() + 1e-9
+        sat =np.zeros((H + 2 * p + 1, W + 2 * p + 1))
 
         def covered_map(ink_map, w, h, inset):
             sat[p + 1:p + 1 + H, p + 1:p + 1 + W] = ink_map.cumsum(0).cumsum(1)
@@ -874,8 +938,8 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
 
         def choose(ink_map):
             covered = covered_map(ink_map, bw, bh, 0)
-            fits = covered <= budget
-            score = np.where(fits, distance, np.inf) if fits.any() else covered
+            fits = (covered <= budget) & allowed
+            score = np.where(fits, distance, np.inf) if fits.any() else np.where(allowed, covered, np.inf)
             return np.unravel_index(np.argmin(score), score.shape), covered, fits.any()
 
         (iy, ix), covered, fits = choose(ink)
@@ -1762,6 +1826,7 @@ def finish_hvb(
     style_legend=True,
     legend_kwargs=None,
     legend_strictness=None,
+    legend_zones=None,
     style_bars=True,
     bar_kwargs=None,
     style_errorbars=True,
@@ -1830,7 +1895,7 @@ def finish_hvb(
         style_hvb_legend(ax.get_legend(), **lk)
 
     if _place_legend:
-        _place_axes_legends([ax], legend_strictness)
+        _place_axes_legends([ax], legend_strictness, legend_zones)
 
     if squircle_frame and not has_raster_or_image:
         _install_hvb_draw_handler(
@@ -1886,7 +1951,7 @@ def finish_hvb_figure(fig, **kwargs):
             lk.setdefault("inset", fk.get("inset", 0.008))
         for leg in fig.legends:
             style_hvb_legend(leg, **lk)
-    _place_axes_legends(finished, kwargs.get("legend_strictness"))
+    _place_axes_legends(finished, kwargs.get("legend_strictness"), kwargs.get("legend_zones"))
     return fig
 
 
@@ -2162,7 +2227,7 @@ def dark_rc(background="#141414", foreground="white", grid="#333333",
 
 def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
         font=None, math=None, grid=False, exponent=120.0, flat_face_ticks=True,
-        legend_strictness=None, auto=True):
+        legend_strictness=None, legend_zones=None, auto=True):
     """Apply the style globally. Figures are finished automatically on save.
 
     `dark` may be True or a background color. `scale` shrinks frame, tick and
@@ -2170,6 +2235,7 @@ def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
     bundled names in TEXT_FONTS, a font name, or a path to a font file, and
     replaces the text font but not the math font. `math` is one of the bundled
     setups in MATH_FONTS, or a font family, and replaces the math font.
+    `legend_zones` limits where legends may go, as described in place_legend.
     """
     plt.style.use(["default", get_style_path()])
     mpl.rcParams["axes.grid"] = bool(grid)
@@ -2196,6 +2262,7 @@ def use(dark=False, scale=None, text=False, linewidth=None, palette=None,
         activate_hvb(palette=None, finish_kwargs={
             "flat_face_ticks": flat_face_ticks,
             "legend_strictness": legend_strictness,
+            "legend_zones": legend_zones,
             "frame_kwargs": {"exponent": exponent},
             "legend_kwargs": {"exponent": exponent},
         })

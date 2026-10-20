@@ -105,6 +105,17 @@ The arguments to `hvb.use()` are:
   between. Above 1 nothing may touch the legend either, and the clearance keeps growing, so 2
   keeps twice the clearance of 1. If no spot is that clear, the legend goes to the least covered
   one.
+- `legend_zones`: where legends may go, one name or a list of names, `"anywhere"` (no limit) by
+  default. The axes are split into a 3 by 3 grid and a legend is in the cell its center is in.
+  The names are `"top-left"`, `"top-right"`, `"bottom-left"`, `"bottom-right"`, `"top"`,
+  `"bottom"`, `"left"`, `"right"`, `"center"`, `"corners"` (the four corners), `"sides"` (top,
+  bottom, left and right together) and `"anywhere"`. An edge name is the whole edge, corners
+  included, so `"top"` is the top row. A list allows any of its zones, so
+  `["corners", "bottom"]` allows the four corners and the bottom row. The legend goes to the
+  nearest allowed spot that is clear enough, or the least covered allowed spot, and the y-range
+  is raised only if that opens a clear spot in the zones. A legend too large for any spot in the
+  zones goes to the closest one. With a zone set, `legend_strictness=0` still moves the legend
+  into the zone, to a spot covered no more than matplotlib's.
 - `auto`: `False` sets the rcParams only, without the squircle frame, the legend styling, the
   rounded bars and error bars, or the longer mid-decade ticks, and switches these off if an
   earlier `hvb.use()` turned them on.
@@ -242,6 +253,6 @@ axes and figure legends. `scale_rc()` and `dark_rc()` return the dictionaries of
 `ticks_on_flat_faces(ax)` hides the ticks that would fall on a rounded corner of the frame.
 `size_mid_decade_ticks(ax.xaxis, fraction)` sets the minor tick lengths of one axis; after
 `hvb.use()` it runs whenever an axis is drawn, with `hvb.MID_DECADE_TICK` as the fraction.
-`place_legend(leg, strictness)` places one axes legend as described above and returns the
-fraction of its area left covered. `finish_hvb` takes the same `legend_strictness`, and
-`hvb.LEGEND_STRICTNESS` sets the default for both.
+`place_legend(leg, strictness, zones=...)` places one axes legend as described above and returns
+the fraction of its area left covered. `finish_hvb` takes the same `legend_strictness` and
+`legend_zones`, and `hvb.LEGEND_STRICTNESS` and `hvb.LEGEND_ZONES` set the defaults for both.
