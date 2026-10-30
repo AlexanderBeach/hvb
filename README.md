@@ -109,15 +109,16 @@ The arguments to `hvb.use()` are:
   one.
 - `legend_zones`: where legends may go, one name or a list of names, `"anywhere"` (no limit) by
   default. The axes are split into a 3 by 3 grid and a legend is in the cell its center is in.
-  The names are `"top-left"`, `"top-right"`, `"bottom-left"`, `"bottom-right"`, `"top"`,
-  `"bottom"`, `"left"`, `"right"`, `"center"`, `"corners"` (the four corners), `"sides"` (top,
-  bottom, left and right together) and `"anywhere"`. An edge name is the whole edge, corners
-  included, so `"top"` is the top row. A list allows any of its zones, so
-  `["corners", "bottom"]` allows the four corners and the bottom row. The legend goes to the
-  nearest allowed spot that is clear enough, or the least covered allowed spot, and a range is
-  extended only if that opens a clear spot in the zones. A legend too large for any spot in the
-  zones goes to the closest one. With a zone set, `legend_strictness=0` still moves the legend
-  into the zone, to a spot covered no more than matplotlib's.
+  The names are `"top-left"`, `"top-right"`, `"bottom-left"`, `"bottom-right"`,
+  `"middle-left"`, `"middle-right"`, `"top"`, `"middle"`, `"bottom"`, `"left"`, `"right"`,
+  `"center"`, `"corners"` (the four corners), `"sides"` (top, bottom, left and right together)
+  and `"anywhere"`. A row or column name is the whole row or column, so `"top"` is the top
+  row, corners included, and `"middle"` the middle row, center included. A list allows any of
+  its zones, so `["corners", "bottom"]` allows the four corners and the bottom row. The legend
+  goes to the nearest allowed spot that is clear enough, or the least covered allowed spot, and
+  a range is extended only if that opens a clear spot in the zones. A legend too large for any
+  spot in the zones goes to the closest one. With a zone set, `legend_strictness=0` still moves
+  the legend into the zone, to a spot covered no more than matplotlib's.
 - `legend_room`: the largest share of the axes width or height a range may be extended by to
   clear a spot for a legend, 0.6 by default. 0 keeps every range as matplotlib sets it.
 - `auto`: `False` sets the rcParams only, without the squircle frame, the legend styling, the
