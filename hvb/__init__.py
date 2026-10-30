@@ -699,7 +699,10 @@ _LEGEND_ZONE_CELLS = {
     "top-right": frozenset({(2, 2)}),
     "bottom-left": frozenset({(0, 0)}),
     "bottom-right": frozenset({(2, 0)}),
+    "middle-left": frozenset({(0, 1)}),
+    "middle-right": frozenset({(2, 1)}),
     "top": frozenset((column, 2) for column in range(3)),
+    "middle": frozenset((column, 1) for column in range(3)),
     "bottom": frozenset((column, 0) for column in range(3)),
     "left": frozenset((0, row) for row in range(3)),
     "right": frozenset((2, row) for row in range(3)),
@@ -862,12 +865,13 @@ def place_legend(leg, strictness=None, clearance=None, make_room="auto", max_roo
     :param max_room: the largest fraction of the axes width or height that `make_room` may
         open. None uses LEGEND_ROOM.
     :param zones: where the legend may go, one name or a list of them from 'top-left',
-        'top-right', 'bottom-left', 'bottom-right', 'top', 'bottom', 'left', 'right',
-        'center', 'corners' (the four corners), 'sides' (top, bottom, left and right) and
-        'anywhere'. The axes are split into a 3 by 3 grid, a legend is in the cell its center
-        is in, and 'top' is the whole top row, corners included. If the legend is too large
-        for any spot in the zones, it goes to the closest one. Strictness 0 still leaves
-        loc="best" alone unless zones are set. None uses LEGEND_ZONES.
+        'top-right', 'bottom-left', 'bottom-right', 'middle-left', 'middle-right', 'top',
+        'middle', 'bottom', 'left', 'right', 'center', 'corners' (the four corners), 'sides'
+        (top, bottom, left and right) and 'anywhere'. The axes are split into a 3 by 3 grid, a
+        legend is in the cell its center is in, 'top' is the whole top row, corners included,
+        and 'middle' the middle row, center included. If the legend is too large for any spot
+        in the zones, it goes to the closest one. Strictness 0 still leaves loc="best" alone
+        unless zones are set. None uses LEGEND_ZONES.
     :return: the fraction of the legend's area covered, or None if it was not moved.
     """
     ax = leg.axes
